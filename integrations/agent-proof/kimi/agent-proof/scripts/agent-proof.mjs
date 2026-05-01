@@ -25,6 +25,12 @@ const CONFIG_NAMES = new Set([
 ]);
 const CONFIG_EXTENSIONS = new Set(['.env', '.toml', '.yaml', '.yml']);
 const TEST_MARKERS = new Set(['test', 'tests', '__tests__', 'spec']);
+const GENERATED_ARTIFACTS = new Set(['verification-ledger.json', 'delivery-report.md']);
+
+function isGeneratedArtifact(filePath) {
+  const normalized = filePath.replaceAll('\\', '/');
+  return GENERATED_ARTIFACTS.has(normalized) || normalized.startsWith('.agent-proof/');
+}
 
 function runGit(repo, args) {
   const result = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
@@ -56,7 +62,8 @@ function collectChanges(repo) {
   return runGit(repo, ['status', '--porcelain=v1'])
     .split('\n')
     .filter((line) => line.trim())
-    .map(parseStatusLine);
+    .map(parseStatusLine)
+    .filter((change) => !isGeneratedArtifact(change.path));
 }
 
 function pathSegments(filePath) {
@@ -151,6 +158,11 @@ function loadLedger(ledgerPath) {
 function writeLedger(ledgerPath, ledger) {
   fs.mkdirSync(path.dirname(path.resolve(ledgerPath)), { recursive: true });
   fs.writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+}
+
+function writeText(filePath, content) {
+  fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
+  fs.writeFileSync(filePath, content);
 }
 
 function loadVerifications(filePath) {
@@ -379,6 +391,11 @@ function commandText(command) {
   return command.map(shellQuote).join(' ');
 }
 
+function currentScriptCommand() {
+  const script = process.argv[1] ? path.resolve(process.argv[1]) : 'agent-proof.mjs';
+  return `node ${shellQuote(script)}`;
+}
+
 function recordCommand(options) {
   const command = options._ || [];
   if (command.length === 0) throw new Error('record requires a command after --');
@@ -410,8 +427,109 @@ function runCheck(options) {
   const verifications = loadVerifications(options['verification-file']);
   const report = analyzeDelivery({ repo: options.repo || '.', intent, claims, verifications });
   const output = options.output || 'delivery-report.md';
-  fs.writeFileSync(output, renderMarkdown(report));
+  writeText(output, renderMarkdown(report));
   console.log(`Wrote ${output} (score ${report.score}/100, ${report.decision})`);
+  return 0;
+}
+
+function readJsonFile(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function detectPackageManager(repo) {
+  const pkgPath = path.join(repo, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    const pkg = readJsonFile(pkgPath);
+    const manager = String(pkg.packageManager || '').split('@')[0];
+    if (manager) return manager;
+  }
+  if (fs.existsSync(path.join(repo, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (fs.existsSync(path.join(repo, 'yarn.lock'))) return 'yarn';
+  if (fs.existsSync(path.join(repo, 'bun.lock')) || fs.existsSync(path.join(repo, 'bun.lockb'))) return 'bun';
+  return 'npm';
+}
+
+function workspaceDirs(repo, pkg) {
+  const workspaces = Array.isArray(pkg.workspaces)
+    ? pkg.workspaces
+    : Array.isArray(pkg.workspaces?.packages)
+      ? pkg.workspaces.packages
+      : [];
+  const dirs = [];
+  for (const item of workspaces) {
+    if (typeof item !== 'string') continue;
+    if (item.endsWith('/*')) {
+      const base = path.join(repo, item.slice(0, -2));
+      if (!fs.existsSync(base)) continue;
+      for (const name of fs.readdirSync(base)) {
+        const candidate = path.join(base, name);
+        if (fs.existsSync(path.join(candidate, 'package.json'))) dirs.push(candidate);
+      }
+    } else {
+      const candidate = path.join(repo, item);
+      if (fs.existsSync(path.join(candidate, 'package.json'))) dirs.push(candidate);
+    }
+  }
+  return dirs;
+}
+
+function scriptCommand(manager, script, pkg, relativeDir) {
+  if (relativeDir === '.') {
+    if (manager === 'npm') return `npm run ${script}`;
+    return `${manager} ${script}`;
+  }
+  if (manager === 'pnpm' && pkg.name) return `pnpm --filter ${pkg.name} ${script}`;
+  if (manager === 'npm') return `npm --workspace ${relativeDir} run ${script}`;
+  if (manager === 'yarn' && pkg.name) return `yarn workspace ${pkg.name} ${script}`;
+  if (manager === 'bun') return `(cd ${relativeDir} && bun run ${script})`;
+  return `(cd ${relativeDir} && ${manager} ${script})`;
+}
+
+function collectPackages(repo) {
+  const rootPkgPath = path.join(repo, 'package.json');
+  if (!fs.existsSync(rootPkgPath)) return [];
+  const rootPkg = readJsonFile(rootPkgPath);
+  const packages = [{ dir: repo, relativeDir: '.', pkg: rootPkg }];
+  for (const dir of workspaceDirs(repo, rootPkg)) {
+    packages.push({ dir, relativeDir: path.relative(repo, dir), pkg: readJsonFile(path.join(dir, 'package.json')) });
+  }
+  return packages;
+}
+
+function doctor(options) {
+  const repo = path.resolve(options.repo || '.');
+  const manager = detectPackageManager(repo);
+  const packages = collectPackages(repo);
+  if (packages.length === 0) {
+    console.log(`No package.json found under ${repo}`);
+    return 0;
+  }
+  console.log('Agent Proof project doctor');
+  console.log(`Repo: ${repo}`);
+  console.log(`Package manager: ${manager}`);
+  console.log('');
+  console.log('Available verification scripts:');
+  const priorities = ['lint', 'typecheck', 'test', 'build'];
+  const recommendations = [];
+  for (const item of packages) {
+    const scripts = item.pkg.scripts || {};
+    const names = Object.keys(scripts).sort();
+    const label = item.relativeDir === '.' ? 'root' : `${item.pkg.name || item.relativeDir} (${item.relativeDir})`;
+    console.log(`- ${label}: ${names.length ? names.join(', ') : '(none)'}`);
+    for (const script of priorities) {
+      if (scripts[script]) recommendations.push(scriptCommand(manager, script, item.pkg, item.relativeDir));
+    }
+  }
+  console.log('');
+  if (recommendations.length) {
+    console.log('Suggested record commands:');
+    const prefix = currentScriptCommand();
+    for (const command of [...new Set(recommendations)]) {
+      console.log(`- ${prefix} record --ledger .agent-proof/verification-ledger.json -- ${command}`);
+    }
+  } else {
+    console.log('No common verification scripts found. Run your project manually, then record the exact command.');
+  }
   return 0;
 }
 
@@ -419,6 +537,7 @@ function usage() {
   return `Usage:
   node agent-proof.mjs record --ledger verification-ledger.json -- <command...>
   node agent-proof.mjs check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md
+  node agent-proof.mjs doctor --repo <repo>
 `;
 }
 
@@ -433,6 +552,7 @@ function main(argv) {
   const options = parseOptions(rest);
   if (command === 'record') return recordCommand(options);
   if (command === 'check') return runCheck(options);
+  if (command === 'doctor') return doctor(options);
   throw new Error(`unknown command: ${command}`);
 }
 

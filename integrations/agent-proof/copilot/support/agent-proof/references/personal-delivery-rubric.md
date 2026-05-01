@@ -46,15 +46,16 @@ The agent's completion claim is not evidence. Evidence comes from git changes, c
 Use Node first because most vibe coding machines already have it:
 
 ```bash
-node generated-skills/agent-proof/scripts/agent-proof.mjs record --ledger verification-ledger.json -- npm test
-node generated-skills/agent-proof/scripts/agent-proof.mjs check --repo . --verification-file verification-ledger.json --output delivery-report.md
+node generated-skills/agent-proof/scripts/agent-proof.mjs doctor --repo .
+node generated-skills/agent-proof/scripts/agent-proof.mjs record --ledger .agent-proof/verification-ledger.json -- pnpm typecheck
+node generated-skills/agent-proof/scripts/agent-proof.mjs check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
 Use Python only when Node is unavailable:
 
 ```bash
-python3 generated-skills/agent-proof/scripts/agent_proof.py record --ledger verification-ledger.json -- python3 -m unittest
-python3 generated-skills/agent-proof/scripts/agent_proof.py check --repo . --verification-file verification-ledger.json --output delivery-report.md
+python3 generated-skills/agent-proof/scripts/agent_proof.py record --ledger .agent-proof/verification-ledger.json -- python3 -m unittest
+python3 generated-skills/agent-proof/scripts/agent_proof.py check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
 ## Reviewer Tone

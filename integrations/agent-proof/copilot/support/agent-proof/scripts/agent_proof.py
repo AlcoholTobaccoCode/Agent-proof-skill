@@ -36,6 +36,12 @@ CONFIG_NAMES = {
 }
 CONFIG_EXTENSIONS = {".env", ".toml", ".yaml", ".yml", ".config.js", ".config.ts"}
 TEST_MARKERS = {"test", "tests", "__tests__", "spec"}
+GENERATED_ARTIFACTS = {"verification-ledger.json", "delivery-report.md"}
+
+
+def is_generated_artifact(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return normalized in GENERATED_ARTIFACTS or normalized.startswith(".agent-proof/")
 
 
 def run_git(repo: Path, args: list[str]) -> str:
@@ -79,7 +85,9 @@ def collect_changes(repo: Path) -> list[dict[str, str]]:
     changes = []
     for line in output.splitlines():
         if line.strip():
-            changes.append(parse_status_line(line))
+            change = parse_status_line(line)
+            if not is_generated_artifact(change["path"]):
+                changes.append(change)
     return changes
 
 
@@ -183,6 +191,11 @@ def load_ledger(path: Path) -> dict[str, Any]:
 def write_ledger(path: Path, ledger: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(ledger, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def command_text(command: list[str]) -> str:
@@ -462,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
         verifications = load_verifications(Path(args.verification_file)) if args.verification_file else []
         report = analyze_delivery(args.repo, intent=intent, claims=claims, verifications=verifications)
         output = Path(args.output)
-        output.write_text(render_markdown(report), encoding="utf-8")
+        write_text(output, render_markdown(report))
         print(f"Wrote {output} (score {report['score']}/100, {report['decision']})")
         return 0
     if args.command == "record":

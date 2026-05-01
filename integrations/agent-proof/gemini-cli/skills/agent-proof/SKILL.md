@@ -27,10 +27,16 @@ The default deliverable is a concise Markdown report that answers:
 3. Capture verification evidence.
    Prefer automatic ledger generation with the Node script. Use Python only as a fallback when Node is unavailable.
 
+   First inspect the target project's actual scripts:
+
+   ```bash
+   node /path/to/agent-proof/scripts/agent-proof.mjs doctor --repo /path/to/project
+   ```
+
    ```bash
    node /path/to/agent-proof/scripts/agent-proof.mjs record \
-     --ledger verification-ledger.json \
-     -- npm test
+     --ledger .agent-proof/verification-ledger.json \
+     -- pnpm typecheck
    ```
 
    This runs the command, records exit code, duration, status, timestamp, and inferred verification type, then appends the result to the ledger. For a command that may fail but should still be recorded without stopping the shell flow, add `--allow-failure`.
@@ -43,8 +49,8 @@ The default deliverable is a concise Markdown report that answers:
      --repo /path/to/project \
      --intent "Fix login persistence" \
      --claims "Login persistence is complete and tests pass" \
-     --verification-file verification-ledger.json \
-     --output delivery-report.md
+     --verification-file .agent-proof/verification-ledger.json \
+     --output .agent-proof/delivery-report.md
    ```
 
    If Node is unavailable, use the Python fallback:
@@ -54,8 +60,8 @@ The default deliverable is a concise Markdown report that answers:
      --repo /path/to/project \
      --intent "Fix login persistence" \
      --claims "Login persistence is complete and tests pass" \
-     --verification-file verification-ledger.json \
-     --output delivery-report.md
+     --verification-file .agent-proof/verification-ledger.json \
+     --output .agent-proof/delivery-report.md
    ```
 
 5. Read the report like a gate, not a summary.
@@ -87,6 +93,8 @@ The checker accepts JSON shaped as either a list or an object with `verification
 Supported `status` values are intentionally loose. Prefer `passed` or `failed` for clarity.
 
 Manual ledger entries are allowed, but automatic `record` entries are preferred because they preserve command text, exit code, duration, and timestamp.
+
+`check` ignores its own root-level `verification-ledger.json`, `delivery-report.md`, and `.agent-proof/` artifacts when scanning git changes, so local evidence files do not pollute the delivery report.
 
 ## Review Rules
 

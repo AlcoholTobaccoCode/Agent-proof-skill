@@ -120,6 +120,29 @@ class AgentProofTests(unittest.TestCase):
             self.assertIn("风险", text)
             self.assertIn(str(output), result.stdout)
 
+    def test_generated_ledger_and_report_are_ignored(self):
+        agent_proof = load_agent_proof()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(Path(tmp))
+            (repo / "delivery-report.md").write_text("generated report\n", encoding="utf-8")
+            (repo / "verification-ledger.json").write_text('{"verifications":[]}\n', encoding="utf-8")
+            (repo / ".agent-proof").mkdir()
+            (repo / ".agent-proof" / "delivery-report.md").write_text("generated report\n", encoding="utf-8")
+            (repo / "src" / "screens" / "Home.tsx").write_text(
+                "export function Home() { return <Text>Done</Text>; }\n",
+                encoding="utf-8",
+            )
+
+            report = agent_proof.analyze_delivery(
+                repo=repo,
+                intent="Polish home UI",
+                claims="Home screen polish is complete",
+                verifications=[{"type": "manual", "command": "manual visual check", "status": "passed"}],
+            )
+
+        changed_paths = [change["path"] for change in report["changes"]]
+        self.assertEqual(changed_paths, ["src/screens/Home.tsx"])
+
     def test_record_command_generates_ledger_entry(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

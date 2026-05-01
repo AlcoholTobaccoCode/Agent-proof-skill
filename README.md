@@ -30,13 +30,21 @@ node scripts/agent-proof.mjs --help
 
 ## 快速使用
 
-先用 Node 记录验证命令，Node 是默认推荐入口：
+先让 Agent Proof 扫一下项目里真实存在的验证脚本，不要默认假设 `npm run lint` 一定存在：
+
+```bash
+node scripts/agent-proof.mjs doctor --repo /path/to/project
+```
+
+再用 Node 记录验证命令，Node 是默认推荐入口：
 
 ```bash
 node scripts/agent-proof.mjs record \
-  --ledger verification-ledger.json \
-  -- npm test
+  --ledger .agent-proof/verification-ledger.json \
+  -- pnpm typecheck
 ```
+
+建议把 `.agent-proof/` 加进被测项目的 `.gitignore`。即使没加，`check` 也会忽略 `.agent-proof/`、根目录 `verification-ledger.json` 和根目录 `delivery-report.md`，避免自生成文件污染报告。
 
 再生成交付验收报告：
 
@@ -45,15 +53,15 @@ node scripts/agent-proof.mjs check \
   --repo /path/to/project \
   --intent "Fix login persistence" \
   --claims "Login persistence is complete and tests pass" \
-  --verification-file verification-ledger.json \
-  --output delivery-report.md
+  --verification-file .agent-proof/verification-ledger.json \
+  --output .agent-proof/delivery-report.md
 ```
 
 如果 Node 不可用，可以用 Python 兜底：
 
 ```bash
 python3 scripts/agent_proof.py record \
-  --ledger verification-ledger.json \
+  --ledger .agent-proof/verification-ledger.json \
   -- python3 -m unittest
 ```
 

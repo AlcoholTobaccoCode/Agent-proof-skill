@@ -78,3 +78,73 @@ test('check command reads generated ledger and writes markdown report', () => {
   assert.match(markdown, /交付可信度/);
   assert.match(markdown, /UI changed without visual evidence/);
 });
+
+test('doctor suggests existing workspace verification scripts', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-doctor-'));
+  const app = path.join(root, 'app');
+  fs.mkdirSync(app, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      name: 'sample-workspace',
+      packageManager: 'pnpm@10.0.0',
+      scripts: { typecheck: 'pnpm -r typecheck' },
+      workspaces: ['app'],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(app, 'package.json'),
+    JSON.stringify({
+      name: '@sample/app',
+      scripts: { typecheck: 'tsc --noEmit' },
+    }),
+  );
+
+  const result = spawnSync('node', [scriptPath, 'doctor', '--repo', root], { encoding: 'utf8' });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Package manager: pnpm/);
+  assert.match(result.stdout, /node .*agent-proof\.mjs record .*pnpm typecheck/);
+  assert.match(result.stdout, /pnpm --filter @sample\/app typecheck/);
+  assert.doesNotMatch(result.stdout, /npm run lint/);
+});
+
+test('check ignores its own generated ledger and report files', () => {
+  const { root, repo } = makeRepo();
+  fs.writeFileSync(path.join(repo, 'delivery-report.md'), 'generated report\n');
+  fs.writeFileSync(path.join(repo, 'verification-ledger.json'), '{"verifications":[]}\n');
+  fs.mkdirSync(path.join(repo, '.agent-proof'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.agent-proof', 'delivery-report.md'), 'generated report\n');
+  fs.writeFileSync(
+    path.join(repo, 'src', 'screens', 'Home.tsx'),
+    'export function Home() { return <Text>Done</Text>; }\n',
+  );
+  const ledger = path.join(root, 'ledger.json');
+  const report = path.join(root, 'nested', 'delivery-report.md');
+  fs.writeFileSync(ledger, JSON.stringify({ verifications: [{ type: 'manual', command: 'manual visual check', status: 'passed' }] }));
+
+  const result = spawnSync(
+    'node',
+    [
+      scriptPath,
+      'check',
+      '--repo',
+      repo,
+      '--intent',
+      'Polish home UI',
+      '--claims',
+      'UI is complete',
+      '--verification-file',
+      ledger,
+      '--output',
+      report,
+    ],
+    { encoding: 'utf8' },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const markdown = fs.readFileSync(report, 'utf8');
+  assert.match(markdown, /modified: `src\/screens\/Home.tsx`/);
+  assert.doesNotMatch(markdown, /verification-ledger\.json/);
+  assert.doesNotMatch(markdown, /delivery-report\.md/);
+});
