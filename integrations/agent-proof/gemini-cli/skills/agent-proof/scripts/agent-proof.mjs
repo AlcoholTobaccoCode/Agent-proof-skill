@@ -26,6 +26,17 @@ const CONFIG_NAMES = new Set([
 const CONFIG_EXTENSIONS = new Set(['.env', '.toml', '.yaml', '.yml']);
 const TEST_MARKERS = new Set(['test', 'tests', '__tests__', 'spec']);
 const GENERATED_ARTIFACTS = new Set(['verification-ledger.json', 'delivery-report.md']);
+const RISK_KEYS = {
+  'No git changes detected': 'noChanges',
+  'No verification evidence provided': 'noVerification',
+  'Verification contains failures': 'verificationFailed',
+  'UI changed without visual evidence': 'uiNoVisual',
+  'Auth/session change lacks behavior verification': 'authNoBehavior',
+  'API/data-flow change lacks failure-path evidence': 'apiNoBehavior',
+  'Config/dependency change lacks runtime verification': 'configNoRuntime',
+  'Claims mention tests but no passing test evidence exists': 'claimsTestsNoEvidence',
+  'Completion claim has no evidence ledger': 'completeNoLedger',
+};
 
 function isGeneratedArtifact(filePath) {
   const normalized = filePath.replaceAll('\\', '/');
@@ -287,6 +298,172 @@ function buildSuggestions(risks) {
   return suggestions;
 }
 
+function normalizeLocaleValue(value) {
+  return String(value || '')
+    .trim()
+    .split('.')[0]
+    .split('@')[0]
+    .replaceAll('_', '-')
+    .toLowerCase();
+}
+
+function languageFromValue(value) {
+  const locale = normalizeLocaleValue(value);
+  if (!locale || locale === 'c' || locale === 'posix') return '';
+  if (['zh', 'cn', 'chinese', '中文'].includes(locale) || locale.startsWith('zh-')) return 'zh';
+  if (['en', 'english'].includes(locale) || locale.startsWith('en-')) return 'en';
+  return '';
+}
+
+function detectReportLanguage(env = process.env) {
+  const envLocale = [env.LC_ALL, env.LC_MESSAGES, env.LANG].find((item) => String(item || '').trim());
+  if (envLocale) return languageFromValue(envLocale) || 'zh';
+  const intlLocale = Intl.DateTimeFormat().resolvedOptions().locale;
+  return languageFromValue(intlLocale) || 'zh';
+}
+
+function resolveReportLanguage(language, env = process.env) {
+  const explicit = String(language || '').trim();
+  if (!explicit || explicit.toLowerCase() === 'auto') return detectReportLanguage(env);
+  return languageFromValue(explicit) || 'zh';
+}
+
+function localizeDecision(decision, language) {
+  if (language !== 'zh') return decision;
+  return (
+    {
+      Ready: '可提交',
+      'Review before commit': '提交前复核',
+      'Needs evidence': '证据不足',
+    }[decision] || decision
+  );
+}
+
+function localizeCategory(category, language) {
+  if (language !== 'zh') return category;
+  return (
+    {
+      api: 'API',
+      auth: '登录/会话',
+      code: '代码',
+      config: '配置',
+      docs: '文档',
+      test: '测试',
+      ui: 'UI',
+    }[category] || category
+  );
+}
+
+function localizeChangeStatus(status, language) {
+  if (language !== 'zh') return status;
+  return (
+    {
+      added: '新增',
+      changed: '变更',
+      deleted: '删除',
+      modified: '修改',
+      renamed: '重命名',
+      untracked: '未跟踪',
+    }[status] || status
+  );
+}
+
+function localizeVerificationStatus(status, language) {
+  if (language !== 'zh') return status;
+  return (
+    {
+      passed: '通过',
+      pass: '通过',
+      success: '通过',
+      successful: '通过',
+      failed: '失败',
+      fail: '失败',
+      error: '错误',
+      errored: '错误',
+      unknown: '未知',
+    }[status] || status
+  );
+}
+
+function localizeSeverity(severity, language) {
+  if (language !== 'zh') return severity;
+  return (
+    {
+      high: '高',
+      medium: '中',
+      low: '低',
+    }[severity] || severity
+  );
+}
+
+function riskKey(risk) {
+  return risk.key || RISK_KEYS[risk.title] || '';
+}
+
+function localizeRiskTitle(risk, language) {
+  if (language !== 'zh') return risk.title;
+  return (
+    {
+      noChanges: '未检测到 git 改动',
+      noVerification: '缺少验证证据',
+      verificationFailed: '验证记录包含失败',
+      uiNoVisual: 'UI 改动缺少视觉证据',
+      authNoBehavior: '登录/会话改动缺少行为验证',
+      apiNoBehavior: 'API/数据流改动缺少行为验证',
+      configNoRuntime: '配置/依赖改动缺少运行验证',
+      claimsTestsNoEvidence: '声称已测试但缺少通过记录',
+      completeNoLedger: '完成声明缺少证据 ledger',
+    }[riskKey(risk)] || risk.title
+  );
+}
+
+function localizeRiskEvidence(risk, language) {
+  if (language !== 'zh') return risk.evidence;
+  const key = riskKey(risk);
+  if (key === 'noChanges') return '`git status` 没有报告改动文件。';
+  if (key === 'noVerification') return '没有记录测试、lint、构建或人工检查。';
+  if (key === 'verificationFailed') return '至少一条验证记录是 failed/error 状态。';
+  if (key === 'uiNoVisual') {
+    const count = Number.parseInt(String(risk.evidence).match(/\d+/)?.[0] || '0', 10);
+    return `${count || '若干'} 个 UI 相关文件有改动，但没有通过截图、浏览器、模拟器或人工视觉检查。`;
+  }
+  if (key === 'authNoBehavior') return '登录、token、会话相关文件有改动，但没有通过测试或人工验证。';
+  if (key === 'apiNoBehavior') return 'API 或请求代码有改动，但没有记录成功/失败路径验证。';
+  if (key === 'configNoRuntime') return '配置、依赖或环境文件有改动，但没有构建、类型检查或启动证据。';
+  if (key === 'claimsTestsNoEvidence') return '完成说明提到了测试，但 ledger 中没有通过的测试记录。';
+  if (key === 'completeNoLedger') return '声称已完成，但没有提供验证记录。';
+  return risk.evidence;
+}
+
+function localizedConfirmed(report, language) {
+  if (language !== 'zh') return report.confirmed;
+  const confirmed = [`从 git status 检测到 ${report.changes.length} 个改动文件。`];
+  const categoryNames = Object.keys(report.categories).sort();
+  if (categoryNames.length) {
+    confirmed.push(`改动分类：${categoryNames.map((item) => localizeCategory(item, language)).join('、')}。`);
+  }
+  const passed = report.verifications.filter((item) => PASS_STATUSES.has(item.status.toLowerCase()));
+  if (passed.length) {
+    confirmed.push(`已记录通过的验证：${passed.map((item) => `${item.type} (${item.command})`).join('、')}。`);
+  }
+  return confirmed;
+}
+
+function localizedSuggestions(report, language) {
+  if (language !== 'zh') return report.suggestions;
+  const titles = new Set(report.risks.map((risk) => riskKey(risk)));
+  const suggestions = [];
+  if (titles.has('uiNoVisual')) suggestions.push('给改动页面补一张截图，或记录一次人工视觉检查。');
+  if (titles.has('authNoBehavior')) suggestions.push('跑一遍登录/会话回归路径，并记录命令或人工结果。');
+  if (titles.has('apiNoBehavior')) suggestions.push('验证这条请求或数据流的成功路径和失败路径。');
+  if (titles.has('configNoRuntime')) suggestions.push('配置或依赖改动后，至少跑一次构建、类型检查或本地启动。');
+  if (titles.has('claimsTestsNoEvidence') || titles.has('noVerification')) {
+    suggestions.push('提交前补一条通过的测试、lint、构建或人工验证记录。');
+  }
+  if (suggestions.length === 0) suggestions.push('手动复核一次 diff，并把验证 ledger 放进提交说明或交付记录。');
+  return suggestions;
+}
+
 function analyzeDelivery({ repo, intent = '', claims = '', verifications = [] }) {
   const repoRoot = gitRoot(repo);
   const normalized = verifications.map(normalizeVerification);
@@ -312,37 +489,43 @@ function analyzeDelivery({ repo, intent = '', claims = '', verifications = [] })
   };
 }
 
-function renderMarkdown(report) {
+function renderMarkdown(report, language = 'auto') {
+  const reportLanguage = resolveReportLanguage(language);
+  if (reportLanguage === 'en') return renderEnglishMarkdown(report);
+  return renderChineseMarkdown(report);
+}
+
+function renderEnglishMarkdown(report) {
   const lines = [
     '# Agent Proof Delivery Report',
     '',
-    `交付可信度: ${report.score}/100`,
-    `判定: ${report.decision}`,
+    `Delivery confidence: ${report.score}/100`,
+    `Decision: ${report.decision}`,
     '',
     '## Scope',
     `- Repo: \`${report.repo}\``,
     `- Intent: ${report.intent || '(not provided)'}`,
     `- Agent claims: ${report.claims || '(not provided)'}`,
     '',
-    '## 已确认',
+    '## Confirmed',
   ];
   for (const item of report.confirmed) lines.push(`- ${item}`);
-  lines.push('', '## 风险');
+  lines.push('', '## Risks');
   if (report.risks.length) {
     lines.push('| Severity | Risk | Evidence |', '|---|---|---|');
     for (const risk of report.risks) lines.push(`| ${risk.severity} | ${risk.title} | ${risk.evidence} |`);
   } else {
     lines.push('- No blocking delivery risks found by the local evidence check.');
   }
-  lines.push('', '## 建议');
+  lines.push('', '## Suggestions');
   for (const item of report.suggestions) lines.push(`- ${item}`);
-  lines.push('', '## 文件改动');
+  lines.push('', '## File Changes');
   if (report.changes.length) {
     for (const change of report.changes) lines.push(`- ${change.status}: \`${change.path}\``);
   } else {
     lines.push('- No changed files detected.');
   }
-  lines.push('', '## 验证记录');
+  lines.push('', '## Verification Records');
   if (report.verifications.length) {
     for (const item of report.verifications) {
       const note = item.note ? ` - ${item.note}` : '';
@@ -350,6 +533,50 @@ function renderMarkdown(report) {
     }
   } else {
     lines.push('- No verification entries were provided.');
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function renderChineseMarkdown(report) {
+  const lines = [
+    '# Agent Proof 交付验收报告',
+    '',
+    `交付可信度: ${report.score}/100`,
+    `判定: ${localizeDecision(report.decision, 'zh')}`,
+    '',
+    '## 范围',
+    `- 仓库: \`${report.repo}\``,
+    `- 目标: ${report.intent || '（未提供）'}`,
+    `- Agent 声称: ${report.claims || '（未提供）'}`,
+    '',
+    '## 已确认',
+  ];
+  for (const item of localizedConfirmed(report, 'zh')) lines.push(`- ${item}`);
+  lines.push('', '## 风险');
+  if (report.risks.length) {
+    lines.push('| 严重级别 | 风险 | 证据 |', '|---|---|---|');
+    for (const risk of report.risks) {
+      lines.push(`| ${localizeSeverity(risk.severity, 'zh')} | ${localizeRiskTitle(risk, 'zh')} | ${localizeRiskEvidence(risk, 'zh')} |`);
+    }
+  } else {
+    lines.push('- 本地证据检查没有发现阻塞性交付风险。');
+  }
+  lines.push('', '## 建议');
+  for (const item of localizedSuggestions(report, 'zh')) lines.push(`- ${item}`);
+  lines.push('', '## 文件改动');
+  if (report.changes.length) {
+    for (const change of report.changes) lines.push(`- ${localizeChangeStatus(change.status, 'zh')}: \`${change.path}\``);
+  } else {
+    lines.push('- 未检测到改动文件。');
+  }
+  lines.push('', '## 验证记录');
+  if (report.verifications.length) {
+    for (const item of report.verifications) {
+      const note = item.note ? ` - ${item.note}` : '';
+      lines.push(`- ${item.type}: \`${item.command}\` -> ${localizeVerificationStatus(item.status, 'zh')}${note}`);
+    }
+  } else {
+    lines.push('- 未提供验证记录。');
   }
   return `${lines.join('\n')}\n`;
 }
@@ -427,7 +654,8 @@ function runCheck(options) {
   const verifications = loadVerifications(options['verification-file']);
   const report = analyzeDelivery({ repo: options.repo || '.', intent, claims, verifications });
   const output = options.output || 'delivery-report.md';
-  writeText(output, renderMarkdown(report));
+  const language = resolveReportLanguage(options.language || options.lang);
+  writeText(output, renderMarkdown(report, language));
   console.log(`Wrote ${output} (score ${report.score}/100, ${report.decision})`);
   return 0;
 }
@@ -536,12 +764,12 @@ function doctor(options) {
 function usage() {
   return `Usage:
   node agent-proof.mjs record --ledger verification-ledger.json -- <command...>
-  node agent-proof.mjs check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md
+  node agent-proof.mjs check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md [--language auto|zh|en]
   node agent-proof.mjs doctor --repo <repo>
 `;
 }
 
-export { analyzeDelivery, inferVerificationType, loadLedger, renderMarkdown };
+export { analyzeDelivery, detectReportLanguage, inferVerificationType, loadLedger, renderMarkdown };
 
 function main(argv) {
   const [command, ...rest] = argv;

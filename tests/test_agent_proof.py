@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -119,6 +120,92 @@ class AgentProofTests(unittest.TestCase):
             self.assertIn("交付可信度", text)
             self.assertIn("风险", text)
             self.assertIn(str(output), result.stdout)
+
+    def test_cli_uses_english_report_for_english_system_locale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            repo = make_repo(tmp_path)
+            (repo / "src" / "screens" / "Home.tsx").write_text(
+                "export function Home() { return <Text>Done</Text>; }\n",
+                encoding="utf-8",
+            )
+            ledger = tmp_path / "ledger.json"
+            ledger.write_text(
+                json.dumps({"verifications": [{"type": "lint", "command": "npm run lint", "status": "passed"}]}),
+                encoding="utf-8",
+            )
+            output = tmp_path / "delivery-report.md"
+            env = {**os.environ, "LANG": "en_US.UTF-8", "LC_ALL": "", "LC_MESSAGES": ""}
+
+            subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPT_PATH),
+                    "check",
+                    "--repo",
+                    str(repo),
+                    "--intent",
+                    "Polish home UI",
+                    "--claims",
+                    "UI is complete",
+                    "--verification-file",
+                    str(ledger),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+                env=env,
+            )
+
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("Delivery confidence", text)
+            self.assertIn("## Confirmed", text)
+            self.assertNotIn("交付可信度", text)
+
+    def test_cli_falls_back_to_chinese_report_for_uncertain_system_locale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            repo = make_repo(tmp_path)
+            (repo / "src" / "screens" / "Home.tsx").write_text(
+                "export function Home() { return <Text>Done</Text>; }\n",
+                encoding="utf-8",
+            )
+            ledger = tmp_path / "ledger.json"
+            ledger.write_text(
+                json.dumps({"verifications": [{"type": "lint", "command": "npm run lint", "status": "passed"}]}),
+                encoding="utf-8",
+            )
+            output = tmp_path / "delivery-report.md"
+            env = {**os.environ, "LANG": "C", "LC_ALL": "", "LC_MESSAGES": ""}
+
+            subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPT_PATH),
+                    "check",
+                    "--repo",
+                    str(repo),
+                    "--intent",
+                    "调整首页 UI",
+                    "--claims",
+                    "首页 UI 已完成",
+                    "--verification-file",
+                    str(ledger),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+                env=env,
+            )
+
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("交付可信度", text)
+            self.assertIn("## 已确认", text)
+            self.assertNotIn("Delivery confidence", text)
 
     def test_generated_ledger_and_report_are_ignored(self):
         agent_proof = load_agent_proof()

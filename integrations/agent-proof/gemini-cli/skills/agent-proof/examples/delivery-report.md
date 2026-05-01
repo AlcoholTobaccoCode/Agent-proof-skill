@@ -1,39 +1,39 @@
-# Agent Proof Delivery Report
+# Agent Proof 交付验收报告
 
 交付可信度: 58/100
-判定: Needs evidence
+判定: 证据不足
 
-## Scope
+## 范围
 
-- Repo: `/Users/example/app`
-- Intent: Fix login persistence after app restart
-- Agent claims: Login persistence is complete and tests pass
+- 仓库: `/Users/example/app`
+- 目标: Fix login persistence after app restart
+- Agent 声称: Login persistence is complete and tests pass
 
 ## 已确认
 
-- Detected 3 changed file(s) from git status.
-- Changed categories: auth, code, ui.
+- 从 git status 检测到 3 个改动文件。
+- 改动分类：登录/会话、代码、UI。
 
 ## 风险
 
-| Severity | Risk | Evidence |
+| 严重级别 | 风险 | 证据 |
 |---|---|---|
-| high | Auth/session change lacks behavior verification | Auth, login, token, or session files changed without passing test or manual evidence. |
-| high | Claims mention tests but no passing test evidence exists | The completion claim references tests, but the ledger has no passing test entry. |
-| medium | UI changed without visual evidence | UI-related files changed, but no visual/manual verification passed. |
+| 高 | 登录/会话改动缺少行为验证 | 登录、token、会话相关文件有改动，但没有通过测试或人工验证。 |
+| 高 | 声称已测试但缺少通过记录 | 完成说明提到了测试，但 ledger 中没有通过的测试记录。 |
+| 中 | UI 改动缺少视觉证据 | 若干个 UI 相关文件有改动，但没有通过截图、浏览器、模拟器或人工视觉检查。 |
 
 ## 建议
 
-- Run the login/session regression path and record the command or manual result.
-- Add at least one passing test, lint, build, or manual verification entry before commit.
-- Capture a screenshot or record a manual visual check for the changed screen.
+- 跑一遍登录/会话回归路径，并记录命令或人工结果。
+- 提交前补一条通过的测试、lint、构建或人工验证记录。
+- 给改动页面补一张截图，或记录一次人工视觉检查。
 
 ## 文件改动
 
-- modified: `src/auth/session.ts`
-- modified: `src/screens/Login.tsx`
-- modified: `src/store/auth.ts`
+- 修改: `src/auth/session.ts`
+- 修改: `src/screens/Login.tsx`
+- 修改: `src/store/auth.ts`
 
 ## 验证记录
 
-- lint: `npm run lint` -> passed - recorded by `agent-proof.mjs record`
+- lint: `npm run lint` -> 通过 - recorded by `agent-proof.mjs record`

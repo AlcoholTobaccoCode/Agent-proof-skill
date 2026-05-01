@@ -51,6 +51,8 @@ node generated-skills/agent-proof/scripts/agent-proof.mjs record --ledger .agent
 node generated-skills/agent-proof/scripts/agent-proof.mjs check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
+`check` renders the report from the current system locale: English locales produce English, Chinese locales produce Chinese, and uncertain locales fall back to Chinese. Use `--language zh` or `--language en` when deterministic report language matters.
+
 Use Python only when Node is unavailable:
 
 ```bash

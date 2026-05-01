@@ -57,6 +57,16 @@ node scripts/agent-proof.mjs check \
   --output .agent-proof/delivery-report.md
 ```
 
+报告默认按当前系统语言生成：能确认英文环境就输出英文，能确认中文环境就输出中文，`C` / `POSIX` / 无法判断时回落中文。需要手动指定时加：
+
+```bash
+node scripts/agent-proof.mjs check \
+  --repo /path/to/project \
+  --verification-file .agent-proof/verification-ledger.json \
+  --output .agent-proof/delivery-report.md \
+  --language zh
+```
+
 如果 Node 不可用，可以用 Python 兜底：
 
 ```bash

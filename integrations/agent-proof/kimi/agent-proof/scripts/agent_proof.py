@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import locale
+import os
 import shlex
 import subprocess
 import sys
@@ -37,6 +39,17 @@ CONFIG_NAMES = {
 CONFIG_EXTENSIONS = {".env", ".toml", ".yaml", ".yml", ".config.js", ".config.ts"}
 TEST_MARKERS = {"test", "tests", "__tests__", "spec"}
 GENERATED_ARTIFACTS = {"verification-ledger.json", "delivery-report.md"}
+RISK_KEYS = {
+    "No git changes detected": "no_changes",
+    "No verification evidence provided": "no_verification",
+    "Verification contains failures": "verification_failed",
+    "UI changed without visual evidence": "ui_no_visual",
+    "Auth/session change lacks behavior verification": "auth_no_behavior",
+    "API/data-flow change lacks failure-path evidence": "api_no_behavior",
+    "Config/dependency change lacks runtime verification": "config_no_runtime",
+    "Claims mention tests but no passing test evidence exists": "claims_tests_no_evidence",
+    "Completion claim has no evidence ledger": "complete_no_ledger",
+}
 
 
 def is_generated_artifact(path: str) -> bool:
@@ -362,6 +375,179 @@ def build_suggestions(risks: list[dict[str, Any]]) -> list[str]:
     return suggestions
 
 
+def normalize_locale_value(value: str | None) -> str:
+    return str(value or "").strip().split(".")[0].split("@")[0].replace("_", "-").lower()
+
+
+def language_from_value(value: str | None) -> str:
+    locale_value = normalize_locale_value(value)
+    if not locale_value or locale_value in {"c", "posix"}:
+        return ""
+    if locale_value in {"zh", "cn", "chinese", "中文"} or locale_value.startswith("zh-"):
+        return "zh"
+    if locale_value in {"en", "english"} or locale_value.startswith("en-"):
+        return "en"
+    return ""
+
+
+def detect_report_language(env: dict[str, str] | None = None) -> str:
+    current_env = os.environ if env is None else env
+    env_locale = next(
+        (item for item in [current_env.get("LC_ALL"), current_env.get("LC_MESSAGES"), current_env.get("LANG")] if str(item or "").strip()),
+        None,
+    )
+    if env_locale:
+        return language_from_value(env_locale) or "zh"
+    locale_name = locale.getlocale()[0]
+    return language_from_value(locale_name) or "zh"
+
+
+def resolve_report_language(language: str | None = None, env: dict[str, str] | None = None) -> str:
+    explicit = str(language or "").strip()
+    if not explicit or explicit.lower() == "auto":
+        return detect_report_language(env)
+    return language_from_value(explicit) or "zh"
+
+
+def localize_decision(decision: str, language: str) -> str:
+    if language != "zh":
+        return decision
+    return {
+        "Ready": "可提交",
+        "Review before commit": "提交前复核",
+        "Needs evidence": "证据不足",
+    }.get(decision, decision)
+
+
+def localize_category(category: str, language: str) -> str:
+    if language != "zh":
+        return category
+    return {
+        "api": "API",
+        "auth": "登录/会话",
+        "code": "代码",
+        "config": "配置",
+        "docs": "文档",
+        "test": "测试",
+        "ui": "UI",
+    }.get(category, category)
+
+
+def localize_change_status(status: str, language: str) -> str:
+    if language != "zh":
+        return status
+    return {
+        "added": "新增",
+        "changed": "变更",
+        "deleted": "删除",
+        "modified": "修改",
+        "renamed": "重命名",
+        "untracked": "未跟踪",
+    }.get(status, status)
+
+
+def localize_verification_status(status: str, language: str) -> str:
+    if language != "zh":
+        return status
+    return {
+        "passed": "通过",
+        "pass": "通过",
+        "success": "通过",
+        "successful": "通过",
+        "failed": "失败",
+        "fail": "失败",
+        "error": "错误",
+        "errored": "错误",
+        "unknown": "未知",
+    }.get(status, status)
+
+
+def localize_severity(severity: str, language: str) -> str:
+    if language != "zh":
+        return severity
+    return {"high": "高", "medium": "中", "low": "低"}.get(severity, severity)
+
+
+def risk_key(risk: dict[str, Any]) -> str:
+    return str(risk.get("key") or RISK_KEYS.get(str(risk.get("title") or ""), ""))
+
+
+def localize_risk_title(risk: dict[str, Any], language: str) -> str:
+    if language != "zh":
+        return str(risk["title"])
+    return {
+        "no_changes": "未检测到 git 改动",
+        "no_verification": "缺少验证证据",
+        "verification_failed": "验证记录包含失败",
+        "ui_no_visual": "UI 改动缺少视觉证据",
+        "auth_no_behavior": "登录/会话改动缺少行为验证",
+        "api_no_behavior": "API/数据流改动缺少行为验证",
+        "config_no_runtime": "配置/依赖改动缺少运行验证",
+        "claims_tests_no_evidence": "声称已测试但缺少通过记录",
+        "complete_no_ledger": "完成声明缺少证据 ledger",
+    }.get(risk_key(risk), str(risk["title"]))
+
+
+def localize_risk_evidence(risk: dict[str, Any], language: str) -> str:
+    if language != "zh":
+        return str(risk["evidence"])
+    key = risk_key(risk)
+    if key == "no_changes":
+        return "`git status` 没有报告改动文件。"
+    if key == "no_verification":
+        return "没有记录测试、lint、构建或人工检查。"
+    if key == "verification_failed":
+        return "至少一条验证记录是 failed/error 状态。"
+    if key == "ui_no_visual":
+        digits = "".join(ch for ch in str(risk["evidence"]) if ch.isdigit())
+        count = digits or "若干"
+        return f"{count} 个 UI 相关文件有改动，但没有通过截图、浏览器、模拟器或人工视觉检查。"
+    if key == "auth_no_behavior":
+        return "登录、token、会话相关文件有改动，但没有通过测试或人工验证。"
+    if key == "api_no_behavior":
+        return "API 或请求代码有改动，但没有记录成功/失败路径验证。"
+    if key == "config_no_runtime":
+        return "配置、依赖或环境文件有改动，但没有构建、类型检查或启动证据。"
+    if key == "claims_tests_no_evidence":
+        return "完成说明提到了测试，但 ledger 中没有通过的测试记录。"
+    if key == "complete_no_ledger":
+        return "声称已完成，但没有提供验证记录。"
+    return str(risk["evidence"])
+
+
+def localized_confirmed(report: dict[str, Any], language: str) -> list[str]:
+    if language != "zh":
+        return list(report["confirmed"])
+    confirmed = [f"从 git status 检测到 {len(report['changes'])} 个改动文件。"]
+    category_names = sorted(report["categories"].keys())
+    if category_names:
+        confirmed.append("改动分类：" + "、".join(localize_category(item, language) for item in category_names) + "。")
+    passed = [item for item in report["verifications"] if item["status"].lower() in PASS_STATUSES]
+    if passed:
+        confirmed.append("已记录通过的验证：" + "、".join(f"{item['type']} ({item['command']})" for item in passed) + "。")
+    return confirmed
+
+
+def localized_suggestions(report: dict[str, Any], language: str) -> list[str]:
+    if language != "zh":
+        return list(report["suggestions"])
+    keys = {risk_key(risk) for risk in report["risks"]}
+    suggestions: list[str] = []
+    if "ui_no_visual" in keys:
+        suggestions.append("给改动页面补一张截图，或记录一次人工视觉检查。")
+    if "auth_no_behavior" in keys:
+        suggestions.append("跑一遍登录/会话回归路径，并记录命令或人工结果。")
+    if "api_no_behavior" in keys:
+        suggestions.append("验证这条请求或数据流的成功路径和失败路径。")
+    if "config_no_runtime" in keys:
+        suggestions.append("配置或依赖改动后，至少跑一次构建、类型检查或本地启动。")
+    if "claims_tests_no_evidence" in keys or "no_verification" in keys:
+        suggestions.append("提交前补一条通过的测试、lint、构建或人工验证记录。")
+    if not suggestions:
+        suggestions.append("手动复核一次 diff，并把验证 ledger 放进提交说明或交付记录。")
+    return suggestions
+
+
 def analyze_delivery(
     repo: str | Path,
     intent: str = "",
@@ -394,23 +580,30 @@ def analyze_delivery(
     }
 
 
-def render_markdown(report: dict[str, Any]) -> str:
+def render_markdown(report: dict[str, Any], language: str = "auto") -> str:
+    report_language = resolve_report_language(language)
+    if report_language == "en":
+        return render_english_markdown(report)
+    return render_chinese_markdown(report)
+
+
+def render_english_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# Agent Proof Delivery Report",
         "",
-        f"交付可信度: {report['score']}/100",
-        f"判定: {report['decision']}",
+        f"Delivery confidence: {report['score']}/100",
+        f"Decision: {report['decision']}",
         "",
         "## Scope",
         f"- Repo: `{report['repo']}`",
         f"- Intent: {report['intent'] or '(not provided)'}",
         f"- Agent claims: {report['claims'] or '(not provided)'}",
         "",
-        "## 已确认",
+        "## Confirmed",
     ]
     for item in report["confirmed"]:
         lines.append(f"- {item}")
-    lines.extend(["", "## 风险"])
+    lines.extend(["", "## Risks"])
     if report["risks"]:
         lines.append("| Severity | Risk | Evidence |")
         lines.append("|---|---|---|")
@@ -419,24 +612,73 @@ def render_markdown(report: dict[str, Any]) -> str:
     else:
         lines.append("- No blocking delivery risks found by the local evidence check.")
 
-    lines.extend(["", "## 建议"])
+    lines.extend(["", "## Suggestions"])
     for item in report["suggestions"]:
         lines.append(f"- {item}")
 
-    lines.extend(["", "## 文件改动"])
+    lines.extend(["", "## File Changes"])
     if report["changes"]:
         for change in report["changes"]:
             lines.append(f"- {change['status']}: `{change['path']}`")
     else:
         lines.append("- No changed files detected.")
 
-    lines.extend(["", "## 验证记录"])
+    lines.extend(["", "## Verification Records"])
     if report["verifications"]:
         for item in report["verifications"]:
             note = f" - {item['note']}" if item["note"] else ""
             lines.append(f"- {item['type']}: `{item['command']}` -> {item['status']}{note}")
     else:
         lines.append("- No verification entries were provided.")
+
+    return "\n".join(lines) + "\n"
+
+
+def render_chinese_markdown(report: dict[str, Any]) -> str:
+    lines = [
+        "# Agent Proof 交付验收报告",
+        "",
+        f"交付可信度: {report['score']}/100",
+        f"判定: {localize_decision(report['decision'], 'zh')}",
+        "",
+        "## 范围",
+        f"- 仓库: `{report['repo']}`",
+        f"- 目标: {report['intent'] or '（未提供）'}",
+        f"- Agent 声称: {report['claims'] or '（未提供）'}",
+        "",
+        "## 已确认",
+    ]
+    for item in localized_confirmed(report, "zh"):
+        lines.append(f"- {item}")
+    lines.extend(["", "## 风险"])
+    if report["risks"]:
+        lines.append("| 严重级别 | 风险 | 证据 |")
+        lines.append("|---|---|---|")
+        for risk in report["risks"]:
+            lines.append(
+                f"| {localize_severity(risk['severity'], 'zh')} | {localize_risk_title(risk, 'zh')} | {localize_risk_evidence(risk, 'zh')} |"
+            )
+    else:
+        lines.append("- 本地证据检查没有发现阻塞性交付风险。")
+
+    lines.extend(["", "## 建议"])
+    for item in localized_suggestions(report, "zh"):
+        lines.append(f"- {item}")
+
+    lines.extend(["", "## 文件改动"])
+    if report["changes"]:
+        for change in report["changes"]:
+            lines.append(f"- {localize_change_status(change['status'], 'zh')}: `{change['path']}`")
+    else:
+        lines.append("- 未检测到改动文件。")
+
+    lines.extend(["", "## 验证记录"])
+    if report["verifications"]:
+        for item in report["verifications"]:
+            note = f" - {item['note']}" if item["note"] else ""
+            lines.append(f"- {item['type']}: `{item['command']}` -> {localize_verification_status(item['status'], 'zh')}{note}")
+    else:
+        lines.append("- 未提供验证记录。")
 
     return "\n".join(lines) + "\n"
 
@@ -458,6 +700,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--claims-file", help="File containing the agent completion claim.")
     check.add_argument("--verification-file", help="JSON file with a verifications list.")
     check.add_argument("--output", default="delivery-report.md", help="Markdown report output path.")
+    check.add_argument("--language", default="auto", help="Report language: auto, zh, or en. Defaults to system locale.")
     record = subparsers.add_parser("record", help="Run a verification command and append it to a ledger.")
     record.add_argument("--ledger", default="verification-ledger.json", help="Verification ledger output path.")
     record.add_argument("--note", default="", help="Optional note to attach to the verification entry.")
@@ -475,7 +718,8 @@ def main(argv: list[str] | None = None) -> int:
         verifications = load_verifications(Path(args.verification_file)) if args.verification_file else []
         report = analyze_delivery(args.repo, intent=intent, claims=claims, verifications=verifications)
         output = Path(args.output)
-        write_text(output, render_markdown(report))
+        language = resolve_report_language(args.language)
+        write_text(output, render_markdown(report, language))
         print(f"Wrote {output} (score {report['score']}/100, {report['decision']})")
         return 0
     if args.command == "record":

@@ -69,14 +69,94 @@ test('check command reads generated ledger and writes markdown report', () => {
       ledger,
       '--output',
       report,
+      '--language',
+      'en',
     ],
     { encoding: 'utf8' },
   );
 
   assert.equal(result.status, 0, result.stderr);
   const markdown = fs.readFileSync(report, 'utf8');
-  assert.match(markdown, /交付可信度/);
+  assert.match(markdown, /Delivery confidence/);
   assert.match(markdown, /UI changed without visual evidence/);
+});
+
+test('check command renders English report for English system locale', () => {
+  const { root, repo } = makeRepo();
+  fs.writeFileSync(
+    path.join(repo, 'src', 'screens', 'Home.tsx'),
+    'export function Home() { return <Text>Done</Text>; }\n',
+  );
+  const ledger = path.join(root, 'verification-ledger.json');
+  const report = path.join(root, 'delivery-report.md');
+  fs.writeFileSync(ledger, JSON.stringify({ verifications: [{ type: 'lint', command: 'npm run lint', status: 'passed' }] }));
+
+  const result = spawnSync(
+    'node',
+    [
+      scriptPath,
+      'check',
+      '--repo',
+      repo,
+      '--intent',
+      'Polish home UI',
+      '--claims',
+      'UI is complete',
+      '--verification-file',
+      ledger,
+      '--output',
+      report,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: '', LC_MESSAGES: '' },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const markdown = fs.readFileSync(report, 'utf8');
+  assert.match(markdown, /Delivery confidence: \d+\/100/);
+  assert.match(markdown, /## Confirmed/);
+  assert.doesNotMatch(markdown, /交付可信度/);
+});
+
+test('check command falls back to Chinese report for uncertain system locale', () => {
+  const { root, repo } = makeRepo();
+  fs.writeFileSync(
+    path.join(repo, 'src', 'screens', 'Home.tsx'),
+    'export function Home() { return <Text>Done</Text>; }\n',
+  );
+  const ledger = path.join(root, 'verification-ledger.json');
+  const report = path.join(root, 'delivery-report.md');
+  fs.writeFileSync(ledger, JSON.stringify({ verifications: [{ type: 'lint', command: 'npm run lint', status: 'passed' }] }));
+
+  const result = spawnSync(
+    'node',
+    [
+      scriptPath,
+      'check',
+      '--repo',
+      repo,
+      '--intent',
+      '调整首页 UI',
+      '--claims',
+      '首页 UI 已完成',
+      '--verification-file',
+      ledger,
+      '--output',
+      report,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, LANG: 'C', LC_ALL: '', LC_MESSAGES: '' },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const markdown = fs.readFileSync(report, 'utf8');
+  assert.match(markdown, /交付可信度: \d+\/100/);
+  assert.match(markdown, /## 已确认/);
+  assert.doesNotMatch(markdown, /Delivery confidence/);
 });
 
 test('doctor suggests existing workspace verification scripts', () => {
@@ -138,6 +218,8 @@ test('check ignores its own generated ledger and report files', () => {
       ledger,
       '--output',
       report,
+      '--language',
+      'en',
     ],
     { encoding: 'utf8' },
   );
