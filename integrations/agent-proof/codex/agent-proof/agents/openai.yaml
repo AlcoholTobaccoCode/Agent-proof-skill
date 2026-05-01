@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Proof"
+  short_description: "Check AI code delivery evidence"
+  default_prompt: "Use $agent-proof to review my AI-assisted code delivery before I commit."

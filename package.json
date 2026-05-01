@@ -1,0 +1,17 @@
+{
+  "name": "agent-proof-skill",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "audit": "node scripts/convert-integrations.mjs audit --skill .",
+    "convert": "node scripts/convert-integrations.mjs convert --skill . --out integrations/agent-proof --tool all",
+    "test": "npm run test:node && npm run test:python",
+    "test:node": "node --check scripts/agent-proof.mjs && node --check scripts/convert-integrations.mjs && node --test tests/agent-proof.test.mjs tests/convert-integrations.test.mjs",
+    "test:python": "python3 -m py_compile scripts/agent_proof.py && python3 -m unittest tests/test_agent_proof.py"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
