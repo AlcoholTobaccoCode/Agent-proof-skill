@@ -22,6 +22,20 @@ Codex / skills.sh 方式：
 npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof
 ```
 
+更新已安装版本时也执行同一条命令：
+
+```bash
+npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof
+```
+
+如果安装器询问是否覆盖，确认即可。想减少交互可以加 `--yes`：
+
+```bash
+npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof --yes
+```
+
+更新完成后重启 Codex 或对应 agent 客户端，避免继续使用旧的 skill 缓存。
+
 本地开发时可以直接在仓库根目录运行：
 
 ```bash
