@@ -168,6 +168,80 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
 
 后续可以把人工检查简化成更顺手的命令，比如 `agent-proof evidence --type visual --status passed --note "..."`。当前版本还没有这个命令，所以文档里先按已经能跑的 `record --note ... -- node -e ...` 写。
 
+## 让你的 AI 自动使用 Agent Proof
+
+你可以把下面这段放进项目的 `AGENTS.md`、Codex 自定义指令、Cursor Rules、Windsurf Rules，或者其他 AI 工具的项目规则里。
+
+重点是：不要写成“每次开始任务时就审查交付可信度”。任务刚开始还没改代码，审不出东西。正确做法是：
+
+- 开始任务时记住用户意图
+- 改完代码后、准备说“完成”前，再跑 Agent Proof
+- 把报告归档到固定位置，方便以后回看
+
+推荐模板：
+
+```text
+每次完成代码改动、准备提交、或准备回复“完成”前，使用 agent-proof 审查本次 AI 改动的交付可信度。
+
+执行要求：
+1. 先运行：
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
+   根据 doctor 输出选择当前项目真实存在的验证命令，不要假设一定有 npm run lint。
+
+2. 至少记录一条真实验证证据：
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+     --ledger .agent-proof/verification-ledger.json \
+     -- <真实验证命令>
+
+3. 生成本次交付验收报告：
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
+     --repo . \
+     --intent "<本次用户需求>" \
+     --claims "<AI 最终完成声明>" \
+     --verification-file .agent-proof/verification-ledger.json \
+     --output .agent-proof/delivery-report.md
+
+4. 如果报告提示 UI、API、配置、测试证据不足，按报告建议补证据后重新 check。不要用口头声明替代证据。
+
+5. 最终回复用户前，简要说明：
+   - Agent Proof 评分和判定
+   - 已记录哪些验证
+   - 还有哪些风险或未验证项
+   - 报告保存位置
+```
+
+如果你想让 AI 把每天的报告集中到一个文件，可以再加这段：
+
+```text
+Agent Proof 报告归档规则：
+- 报告根目录：<你自己的报告目录>/agent-proof
+- 项目名：优先使用 git 根目录文件夹名
+- 每天一个归档文件：<报告根目录>/<项目名>/YYYY-MM-DD.md
+- 同一天的多个任务追加到同一个 md 中
+- 每个任务用二级标题分隔：## HH:mm 任务重点
+- 不要把 agent-proof check --output 直接写到当天归档文件，避免覆盖旧任务；先输出到 .agent-proof/delivery-report.md，再把本次报告内容追加到当天归档文件
+```
+
+macOS 本机路径示例：
+
+```text
+报告根目录：/Users/Shared/ai_memory/skills-test/agent-proof
+当天归档文件：/Users/Shared/ai_memory/skills-test/agent-proof/<项目名>/YYYY-MM-DD.md
+任务标题：## HH:mm 调整首页 UI
+```
+
+你原来的写法：
+
+```text
+审查结果放在 '/Users/Shared/ai_memory/skills-test/agent-proof/${项目名称}/${日期}_${时间}.md' 当天的任务放在同一个 md 中
+```
+
+这里有个小冲突：`${日期}_${时间}.md` 会变成每个任务一个文件，不是“当天同一个 md”。如果想当天一个文件，建议改成：
+
+```text
+审查结果追加到 '/Users/Shared/ai_memory/skills-test/agent-proof/${项目名称}/${日期}.md'，每个任务标题为 '## ${时间} ${任务重点}'。
+```
+
 ## 语言规则
 
 Agent Proof 的用户可见输出默认跟随当前系统语言：
