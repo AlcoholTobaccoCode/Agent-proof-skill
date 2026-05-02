@@ -1,60 +1,62 @@
 # Agent Proof Skill
 
-Agent Proof 是一个给个人开发者用的 AI 交付验收 skill。
+Agent Proof 是给“团队里的个人开发者”用的 AI 交付验收小工具。
 
-它不负责替你写代码，而是在 AI agent 说“完成了”之后，帮你在提交前检查：
+你让 AI 改完代码后，别急着提交。先让它过一遍 Agent Proof，看看三件事：
 
-- git 实际改了哪些文件
-- agent 声称完成了什么
-- 测试、lint、build、截图、人工检查有没有证据
-- 有没有“说测试通过但没有测试记录”的假完成
-- UI、auth、API、config 等改动是否缺少对应验证
+- 这次到底改了哪些文件
+- AI 最后说自己完成了什么
+- 有没有真实验证记录，比如 typecheck、测试、构建、截图、人工检查
 
-一句话：
+说白了就是一句话：
 
-> AI 说做完了，先别信，让它拿证据。
+> AI 说做完了，先别信，让它把证据拿出来。
 
-## 安装
+它不是团队后台，不管成员、权限、审批、PR bot、CI/CD。第一阶段只做一件事：帮个人开发者在提交前把“AI 交付到底靠不靠谱”看明白。
 
-Codex / skills.sh 方式：
+## 安装和更新
 
-```bash
-npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof
-```
-
-更新已安装版本时也执行同一条命令：
+给 Codex / skills.sh 安装：
 
 ```bash
 npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof
 ```
 
-如果安装器询问是否覆盖，确认即可。想减少交互可以加 `--yes`：
+更新也跑同一条：
+
+```bash
+npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof
+```
+
+如果安装器问要不要覆盖，确认就行。想少点交互可以加 `--yes`：
 
 ```bash
 npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill agent-proof --yes
 ```
 
-更新完成后重启 Codex 或对应 agent 客户端，避免继续使用旧的 skill 缓存。
+更新完最好重启一下 Codex 或你正在用的 agent 客户端，不然有些客户端会继续吃旧缓存。
 
-注意：`npx skills add ...` 是把 skill 安装给 agent 用，不会在你的每个业务项目里创建 `scripts/agent-proof.mjs`。在业务项目里手动跑命令时，用下面“快速使用”里的 `npx --yes github:...` 通用命令。
-
-本地开发时可以直接在仓库根目录运行：
+注意：`npx skills add ...` 是把 skill 装给 agent 用，不是在你的业务项目里生成 `scripts/agent-proof.mjs`。所以在任意项目里手动跑 Agent Proof 时，不要写：
 
 ```bash
-node scripts/agent-proof.mjs --help
+node scripts/agent-proof.mjs doctor --repo .
 ```
 
-## 快速使用
+这条命令会去当前业务项目的 `scripts/` 目录找文件，项目里没有就会报 `Cannot find module`。通用跑法看下面。
 
-在任意项目里使用时，不要写 `node scripts/agent-proof.mjs`。这个相对路径会指向当前业务项目的 `scripts/` 目录；如果项目里没有这个文件，就会报 `Cannot find module .../scripts/agent-proof.mjs`。
+## 第一次在项目里怎么跑
 
-通用方式是用 GitHub 包入口运行。先让 Agent Proof 扫一下项目里真实存在的验证脚本，不要默认假设 `npm run lint` 一定存在：
+先进入你要检查的项目根目录。
+
+第一步，让 Agent Proof 看看这个项目到底有哪些验证脚本：
 
 ```bash
 npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
 ```
 
-再用 Node 记录验证命令，Node 是默认推荐入口：
+它会告诉你项目用的是 npm、pnpm、yarn 还是 bun，也会列出真实存在的 `lint`、`typecheck`、`test`、`build` 脚本。别上来就复制 `npm run lint`，项目里不一定有，上次那类低级路径和脚本假设就是这么来的。
+
+第二步，复制 doctor 推荐的命令，用 `record` 记录一次真实验证：
 
 ```bash
 npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
@@ -62,30 +64,88 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
   -- pnpm typecheck
 ```
 
-建议把 `.agent-proof/` 加进被测项目的 `.gitignore`。即使没加，`check` 也会忽略 `.agent-proof/`、根目录 `verification-ledger.json` 和根目录 `delivery-report.md`，避免自生成文件污染报告。
+`record` 会真正运行 `pnpm typecheck`，然后把命令、退出码、耗时、通过/失败状态写进 `.agent-proof/verification-ledger.json`。
 
-再生成交付验收报告：
+第三步，生成交付验收报告：
 
 ```bash
 npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
   --repo . \
-  --intent "Fix login persistence" \
-  --claims "Login persistence is complete and tests pass" \
+  --intent "这次让 AI 改什么" \
+  --claims "AI 最后声称完成了什么" \
   --verification-file .agent-proof/verification-ledger.json \
   --output .agent-proof/delivery-report.md
 ```
 
-报告默认按当前系统语言生成：能确认英文环境就输出英文，能确认中文环境就输出中文，`C` / `POSIX` / 无法判断时回落中文。需要手动指定时加：
+打开 `.agent-proof/delivery-report.md`，重点看：
+
+- 评分是多少
+- 有哪些风险
+- 哪些证据缺了
+- 需要补跑什么验证
+
+低分不等于代码一定烂，它只说明证据不够。比如 UI 改了却没截图，配置改了却没 build，API 改了却没跑成功/失败路径，这些都会被打下来。
+
+## 语言规则
+
+Agent Proof 的用户可见输出默认跟随当前系统语言：
+
+- 明确是英文环境：输出英文
+- 明确是中文环境：输出中文
+- `C`、`POSIX`、空值、识别不准：兜底输出中文
+
+现在这些输出都会走这个规则：
+
+- `doctor` 项目体检输出
+- `check` 生成的 Markdown 报告
+- `record` / `check` 的完成提示
+- `--help` 帮助文本
+
+想强制指定语言就加：
 
 ```bash
-npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
-  --repo . \
-  --verification-file .agent-proof/verification-ledger.json \
-  --output .agent-proof/delivery-report.md \
-  --language zh
+--language zh
 ```
 
-如果 Node 不可用，可以用 Python 兜底，但要写 Agent Proof 的真实安装路径或克隆路径，不要写当前业务项目里的相对路径：
+或者：
+
+```bash
+--language en
+```
+
+例如：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo . --language zh
+```
+
+## 推荐放哪里
+
+建议把 Agent Proof 的产物都放到 `.agent-proof/`：
+
+```text
+.agent-proof/
+├── verification-ledger.json
+└── delivery-report.md
+```
+
+然后在业务项目的 `.gitignore` 里加：
+
+```gitignore
+.agent-proof/
+```
+
+即使你忘了加，Agent Proof 在扫描 git 改动时也会忽略 `.agent-proof/`、根目录 `verification-ledger.json`、根目录 `delivery-report.md`，不会把自己生成的报告当成你的业务改动。
+
+## Node 优先，Python 兜底
+
+默认推荐用 Node 版，因为现在 vibe coding 常见环境基本都有 Node：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill --help
+```
+
+如果 Node 真不可用，可以用 Python 版兜底。但 Python 版需要你知道 Agent Proof 的真实安装路径或克隆路径，不要写业务项目里的相对路径：
 
 ```bash
 python3 /path/to/Agent-proof-skill/scripts/agent_proof.py record \
@@ -93,13 +153,13 @@ python3 /path/to/Agent-proof-skill/scripts/agent_proof.py record \
   -- python3 -m unittest
 ```
 
-## 多工具兼容
+## 支持哪些工具
 
 原生支持：
 
 - Codex
 
-转换支持：
+转换后支持：
 
 - Antigravity
 - Gemini CLI
@@ -114,6 +174,12 @@ python3 /path/to/Agent-proof-skill/scripts/agent_proof.py record \
 生成所有兼容格式：
 
 ```bash
+npm run convert
+```
+
+或者直接跑：
+
+```bash
 node scripts/convert-integrations.mjs convert \
   --skill . \
   --out integrations/agent-proof \
@@ -123,10 +189,10 @@ node scripts/convert-integrations.mjs convert \
 审查兼容状态：
 
 ```bash
-node scripts/convert-integrations.mjs audit --skill .
+npm run audit
 ```
 
-转换产物在 `integrations/agent-proof/`。转换脚本只写仓库内文件，不会修改你的 `~/.config`、`.cursor`、`.opencode` 等真实工具配置目录。
+转换产物在 `integrations/agent-proof/`。转换脚本只写仓库内文件，不会偷偷改你的 `~/.config`、`.cursor`、`.opencode` 等真实工具配置目录。
 
 ## 仓库结构
 
@@ -134,38 +200,29 @@ node scripts/convert-integrations.mjs audit --skill .
 .
 ├── SKILL.md
 ├── agents/
-│   └── openai.yaml
 ├── examples/
-│   └── delivery-report.md
 ├── integrations/
-│   └── agent-proof/
 ├── references/
-│   ├── compatibility-targets.md
-│   └── personal-delivery-rubric.md
 ├── scripts/
 │   ├── agent-proof.mjs
 │   ├── agent_proof.py
 │   └── convert-integrations.mjs
 └── tests/
-    ├── agent-proof.test.mjs
-    ├── convert-integrations.test.mjs
-    └── test_agent_proof.py
 ```
 
-## 验证
+## 开发验证
+
+跑完整测试：
 
 ```bash
 npm test
 ```
 
-或者分别运行：
+分开跑：
 
 ```bash
-node --check scripts/agent-proof.mjs
-node --check scripts/convert-integrations.mjs
-node --test tests/agent-proof.test.mjs tests/convert-integrations.test.mjs
-python3 -m py_compile scripts/agent_proof.py
-python3 -m unittest tests/test_agent_proof.py
+npm run test:node
+npm run test:python
 ```
 
 Skill 基础校验：
@@ -174,7 +231,7 @@ Skill 基础校验：
 python /path/to/skill-creator/scripts/quick_validate.py .
 ```
 
-如果你在别的机器上没有 Codex 的 `quick_validate.py`，可以跳过这条；Node/Python 测试是主要运行时验证。
+如果你在别的机器上没有这个 `quick_validate.py`，可以跳过。真正的运行时验证主要看 Node/Python 测试。
 
 ## 许可证
 

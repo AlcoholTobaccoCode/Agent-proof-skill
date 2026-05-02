@@ -182,13 +182,71 @@ test('doctor suggests existing workspace verification scripts', () => {
     }),
   );
 
-  const result = spawnSync('node', [scriptPath, 'doctor', '--repo', root], { encoding: 'utf8' });
+  const result = spawnSync('node', [scriptPath, 'doctor', '--repo', root], {
+    encoding: 'utf8',
+    env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: '', LC_MESSAGES: '' },
+  });
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Package manager: pnpm/);
   assert.match(result.stdout, /node .*agent-proof\.mjs record .*pnpm typecheck/);
   assert.match(result.stdout, /pnpm --filter @sample\/app typecheck/);
   assert.doesNotMatch(result.stdout, /npm run lint/);
+});
+
+test('doctor renders English output for English system locale', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-doctor-en-'));
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      scripts: { typecheck: 'tsc --noEmit' },
+    }),
+  );
+
+  const result = spawnSync('node', [scriptPath, 'doctor', '--repo', root], {
+    encoding: 'utf8',
+    env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: '', LC_MESSAGES: '' },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Agent Proof project doctor/);
+  assert.match(result.stdout, /Package manager: npm/);
+  assert.match(result.stdout, /Available verification scripts:/);
+  assert.doesNotMatch(result.stdout, /包管理器/);
+});
+
+test('doctor falls back to Chinese output for uncertain system locale', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-doctor-zh-'));
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      scripts: { typecheck: 'tsc --noEmit' },
+    }),
+  );
+
+  const result = spawnSync('node', [scriptPath, 'doctor', '--repo', root], {
+    encoding: 'utf8',
+    env: { ...process.env, LANG: 'C', LC_ALL: '', LC_MESSAGES: '' },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Agent Proof 项目体检/);
+  assert.match(result.stdout, /包管理器: npm/);
+  assert.match(result.stdout, /可用验证脚本:/);
+  assert.match(result.stdout, /建议记录命令:/);
+  assert.doesNotMatch(result.stdout, /Package manager:/);
+});
+
+test('help falls back to Chinese output for uncertain system locale', () => {
+  const result = spawnSync('node', [scriptPath, '--help'], {
+    encoding: 'utf8',
+    env: { ...process.env, LANG: 'C', LC_ALL: '', LC_MESSAGES: '' },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /用法:/);
+  assert.match(result.stdout, /agent-proof doctor/);
+  assert.doesNotMatch(result.stdout, /Usage:/);
 });
 
 test('package exposes agent-proof binary for npx usage from any project', () => {

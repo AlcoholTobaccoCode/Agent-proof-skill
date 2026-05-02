@@ -77,7 +77,7 @@ The default deliverable is a concise Markdown report that answers:
      --output .agent-proof/delivery-report.md
    ```
 
-   Reports default to the user's current system language. The checker emits English for clear English locales, Chinese for clear Chinese locales, and falls back to Chinese when locale detection is uncertain. To force a language, add `--language zh` or `--language en`.
+   User-facing output defaults to the user's current system language, including `doctor`, `check` reports, completion messages, and `--help`. The CLI emits English for clear English locales, Chinese for clear Chinese locales, and falls back to Chinese when locale detection is uncertain. To force a language, add `--language zh` or `--language en`.
 
    If Node is unavailable, use the Python fallback:
 

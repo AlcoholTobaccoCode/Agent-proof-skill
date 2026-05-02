@@ -51,7 +51,7 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record --ledger .agent-pro
 npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
-`check` renders the report from the current system locale: English locales produce English, Chinese locales produce Chinese, and uncertain locales fall back to Chinese. Use `--language zh` or `--language en` when deterministic report language matters.
+User-facing output follows the current system locale by default: `doctor`, `check` reports, completion messages, and `--help` use English for clear English locales, Chinese for clear Chinese locales, and Chinese as the fallback when detection is uncertain. Use `--language zh` or `--language en` when deterministic report language matters.
 
 Use Python only when Node is unavailable:
 

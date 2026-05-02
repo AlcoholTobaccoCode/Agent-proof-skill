@@ -137,7 +137,7 @@ class AgentProofTests(unittest.TestCase):
             output = tmp_path / "delivery-report.md"
             env = {**os.environ, "LANG": "en_US.UTF-8", "LC_ALL": "", "LC_MESSAGES": ""}
 
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "python3",
                     str(SCRIPT_PATH),
@@ -180,7 +180,7 @@ class AgentProofTests(unittest.TestCase):
             output = tmp_path / "delivery-report.md"
             env = {**os.environ, "LANG": "C", "LC_ALL": "", "LC_MESSAGES": ""}
 
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "python3",
                     str(SCRIPT_PATH),
@@ -206,6 +206,7 @@ class AgentProofTests(unittest.TestCase):
             self.assertIn("交付可信度", text)
             self.assertIn("## 已确认", text)
             self.assertNotIn("Delivery confidence", text)
+            self.assertIn("已写入", result.stdout)
 
     def test_generated_ledger_and_report_are_ignored(self):
         agent_proof = load_agent_proof()
@@ -250,6 +251,7 @@ class AgentProofTests(unittest.TestCase):
                 check=True,
                 text=True,
                 capture_output=True,
+                env={**os.environ, "LANG": "C", "LC_ALL": "", "LC_MESSAGES": ""},
             )
 
             data = json.loads(ledger.read_text(encoding="utf-8"))
@@ -258,6 +260,7 @@ class AgentProofTests(unittest.TestCase):
             self.assertEqual(data["verifications"][0]["exit_code"], 0)
             self.assertIn("python3 -c", data["verifications"][0]["command"])
             self.assertIn(str(ledger), result.stdout)
+            self.assertIn("已记录通过验证", result.stdout)
 
 
 if __name__ == "__main__":

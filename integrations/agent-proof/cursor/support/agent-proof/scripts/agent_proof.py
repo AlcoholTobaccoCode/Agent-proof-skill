@@ -215,7 +215,16 @@ def command_text(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
-def record_command(command: list[str], ledger_path: Path, note: str = "", allow_failure: bool = False) -> int:
+def localize_record_status(status: str, language: str) -> str:
+    if language != "zh":
+        return status
+    return {
+        "passed": "通过",
+        "failed": "失败",
+    }.get(status, status)
+
+
+def record_command(command: list[str], ledger_path: Path, note: str = "", allow_failure: bool = False, language: str = "auto") -> int:
     if not command:
         raise ValueError("record requires a command after --")
     if command[0] == "--":
@@ -240,7 +249,11 @@ def record_command(command: list[str], ledger_path: Path, note: str = "", allow_
     ledger = load_ledger(ledger_path)
     ledger["verifications"].append(entry)
     write_ledger(ledger_path, ledger)
-    print(f"Recorded {status} verification in {ledger_path}")
+    output_language = resolve_report_language(language)
+    if output_language == "zh":
+        print(f"已记录{localize_record_status(status, output_language)}验证到 {ledger_path}")
+    else:
+        print(f"Recorded {status} verification in {ledger_path}")
     if allow_failure:
         return 0
     return result.returncode
@@ -704,6 +717,7 @@ def build_parser() -> argparse.ArgumentParser:
     record = subparsers.add_parser("record", help="Run a verification command and append it to a ledger.")
     record.add_argument("--ledger", default="verification-ledger.json", help="Verification ledger output path.")
     record.add_argument("--note", default="", help="Optional note to attach to the verification entry.")
+    record.add_argument("--language", default="auto", help="Output language: auto, zh, or en. Defaults to system locale.")
     record.add_argument("--allow-failure", action="store_true", help="Record failed commands but exit 0.")
     record.add_argument("record_command", nargs=argparse.REMAINDER, help="Command to run, usually after --.")
     return parser
@@ -720,10 +734,13 @@ def main(argv: list[str] | None = None) -> int:
         output = Path(args.output)
         language = resolve_report_language(args.language)
         write_text(output, render_markdown(report, language))
-        print(f"Wrote {output} (score {report['score']}/100, {report['decision']})")
+        if language == "zh":
+            print(f"已写入 {output}（评分 {report['score']}/100，{localize_decision(report['decision'], language)}）")
+        else:
+            print(f"Wrote {output} (score {report['score']}/100, {report['decision']})")
         return 0
     if args.command == "record":
-        return record_command(args.record_command, Path(args.ledger), note=args.note, allow_failure=args.allow_failure)
+        return record_command(args.record_command, Path(args.ledger), note=args.note, allow_failure=args.allow_failure, language=args.language)
     parser.error("unknown command")
     return 2
 

@@ -386,6 +386,16 @@ function localizeVerificationStatus(status, language) {
   );
 }
 
+function localizeRecordStatus(status, language) {
+  if (language !== 'zh') return status;
+  return (
+    {
+      passed: '通过',
+      failed: '失败',
+    }[status] || status
+  );
+}
+
 function localizeSeverity(severity, language) {
   if (language !== 'zh') return severity;
   return (
@@ -463,6 +473,41 @@ function localizedSuggestions(report, language) {
   }
   if (suggestions.length === 0) suggestions.push('手动复核一次 diff，并把验证 ledger 放进提交说明或交付记录。');
   return suggestions;
+}
+
+function outputLanguage(options = {}) {
+  return resolveReportLanguage(options.language || options.lang);
+}
+
+function cliLabel(key, language) {
+  if (language !== 'zh') {
+    return (
+      {
+        doctorTitle: 'Agent Proof project doctor',
+        repo: 'Repo',
+        packageManager: 'Package manager',
+        availableScripts: 'Available verification scripts',
+        root: 'root',
+        none: '(none)',
+        suggestions: 'Suggested record commands',
+        noPackage: 'No package.json found under',
+        noRecommendations: 'No common verification scripts found. Run your project manually, then record the exact command.',
+      }[key] || key
+    );
+  }
+  return (
+    {
+      doctorTitle: 'Agent Proof 项目体检',
+      repo: '仓库',
+      packageManager: '包管理器',
+      availableScripts: '可用验证脚本',
+      root: '根目录',
+      none: '（无）',
+      suggestions: '建议记录命令',
+      noPackage: '没有找到 package.json，扫描路径',
+      noRecommendations: '没有找到常见验证脚本。请先手动跑项目验证，再记录真实命令。',
+    }[key] || key
+  );
 }
 
 function analyzeDelivery({ repo, intent = '', claims = '', verifications = [] }) {
@@ -640,6 +685,7 @@ function recordCommand(options) {
   const command = options._ || [];
   if (command.length === 0) throw new Error('record requires a command after --');
   const ledgerPath = options.ledger || 'verification-ledger.json';
+  const language = outputLanguage(options);
   const started = Date.now();
   const result = spawnSync(command[0], command.slice(1), { stdio: 'inherit' });
   const durationMs = Date.now() - started;
@@ -657,7 +703,11 @@ function recordCommand(options) {
   const ledger = loadLedger(ledgerPath);
   ledger.verifications.push(entry);
   writeLedger(ledgerPath, ledger);
-  console.log(`Recorded ${entry.status} verification in ${ledgerPath}`);
+  if (language === 'zh') {
+    console.log(`已记录${localizeRecordStatus(entry.status, language)}验证到 ${ledgerPath}`);
+  } else {
+    console.log(`Recorded ${entry.status} verification in ${ledgerPath}`);
+  }
   return options['allow-failure'] ? 0 : exitCode;
 }
 
@@ -667,9 +717,13 @@ function runCheck(options) {
   const verifications = loadVerifications(options['verification-file']);
   const report = analyzeDelivery({ repo: options.repo || '.', intent, claims, verifications });
   const output = options.output || 'delivery-report.md';
-  const language = resolveReportLanguage(options.language || options.lang);
+  const language = outputLanguage(options);
   writeText(output, renderMarkdown(report, language));
-  console.log(`Wrote ${output} (score ${report.score}/100, ${report.decision})`);
+  if (language === 'zh') {
+    console.log(`已写入 ${output}（评分 ${report.score}/100，${localizeDecision(report.decision, language)}）`);
+  } else {
+    console.log(`Wrote ${output} (score ${report.score}/100, ${report.decision})`);
+  }
   return 0;
 }
 
@@ -739,46 +793,56 @@ function collectPackages(repo) {
 
 function doctor(options) {
   const repo = path.resolve(options.repo || '.');
+  const language = outputLanguage(options);
   const manager = detectPackageManager(repo);
   const packages = collectPackages(repo);
   if (packages.length === 0) {
-    console.log(`No package.json found under ${repo}`);
+    if (language === 'zh') console.log(`${cliLabel('noPackage', language)}: ${repo}`);
+    else console.log(`${cliLabel('noPackage', language)} ${repo}`);
     return 0;
   }
-  console.log('Agent Proof project doctor');
-  console.log(`Repo: ${repo}`);
-  console.log(`Package manager: ${manager}`);
+  console.log(cliLabel('doctorTitle', language));
+  console.log(`${cliLabel('repo', language)}: ${repo}`);
+  console.log(`${cliLabel('packageManager', language)}: ${manager}`);
   console.log('');
-  console.log('Available verification scripts:');
+  console.log(`${cliLabel('availableScripts', language)}:`);
   const priorities = ['lint', 'typecheck', 'test', 'build'];
   const recommendations = [];
   for (const item of packages) {
     const scripts = item.pkg.scripts || {};
     const names = Object.keys(scripts).sort();
-    const label = item.relativeDir === '.' ? 'root' : `${item.pkg.name || item.relativeDir} (${item.relativeDir})`;
-    console.log(`- ${label}: ${names.length ? names.join(', ') : '(none)'}`);
+    const label = item.relativeDir === '.' ? cliLabel('root', language) : `${item.pkg.name || item.relativeDir} (${item.relativeDir})`;
+    console.log(`- ${label}: ${names.length ? names.join(', ') : cliLabel('none', language)}`);
     for (const script of priorities) {
       if (scripts[script]) recommendations.push(scriptCommand(manager, script, item.pkg, item.relativeDir));
     }
   }
   console.log('');
   if (recommendations.length) {
-    console.log('Suggested record commands:');
+    console.log(`${cliLabel('suggestions', language)}:`);
     const prefix = currentScriptCommand();
     for (const command of [...new Set(recommendations)]) {
       console.log(`- ${prefix} record --ledger .agent-proof/verification-ledger.json -- ${command}`);
     }
   } else {
-    console.log('No common verification scripts found. Run your project manually, then record the exact command.');
+    console.log(cliLabel('noRecommendations', language));
   }
   return 0;
 }
 
-function usage() {
+function usage(language = 'auto') {
+  const resolved = resolveReportLanguage(language);
+  if (resolved === 'zh') {
+    return `用法:
+  agent-proof record --ledger verification-ledger.json -- <验证命令...>
+  agent-proof check --repo <仓库路径> --intent <需求说明> --claims <Agent声明> --verification-file <ledger.json> --output delivery-report.md [--language auto|zh|en]
+  agent-proof doctor --repo <仓库路径> [--language auto|zh|en]
+`;
+  }
   return `Usage:
   agent-proof record --ledger verification-ledger.json -- <command...>
   agent-proof check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md [--language auto|zh|en]
-  agent-proof doctor --repo <repo>
+  agent-proof doctor --repo <repo> [--language auto|zh|en]
 `;
 }
 
