@@ -26,6 +26,7 @@ const CONFIG_NAMES = new Set([
 const CONFIG_EXTENSIONS = new Set(['.env', '.toml', '.yaml', '.yml']);
 const TEST_MARKERS = new Set(['test', 'tests', '__tests__', 'spec']);
 const GENERATED_ARTIFACTS = new Set(['verification-ledger.json', 'delivery-report.md']);
+const NPX_GITHUB_COMMAND = 'npx --yes github:AlcoholTobaccoCode/Agent-proof-skill';
 const RISK_KEYS = {
   'No git changes detected': 'noChanges',
   'No verification evidence provided': 'noVerification',
@@ -620,7 +621,11 @@ function commandText(command) {
 
 function currentScriptCommand() {
   const script = process.argv[1] ? path.resolve(process.argv[1]) : 'agent-proof.mjs';
-  if (path.basename(script) === 'agent-proof') return 'agent-proof';
+  if (path.basename(script) === 'agent-proof') {
+    const normalized = script.replaceAll('\\', '/');
+    if (normalized.includes('/.npm/_npx/')) return NPX_GITHUB_COMMAND;
+    return 'agent-proof';
+  }
   return `node ${shellQuote(script)}`;
 }
 

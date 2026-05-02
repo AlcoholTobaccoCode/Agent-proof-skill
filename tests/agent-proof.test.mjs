@@ -213,7 +213,7 @@ test('package exposes agent-proof binary for npx usage from any project', () => 
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /agent-proof check/);
   assert.equal(doctor.status, 0, doctor.stderr);
-  assert.match(doctor.stdout, /agent-proof record --ledger/);
+  assert.match(doctor.stdout, /npx --yes github:AlcoholTobaccoCode\/Agent-proof-skill record --ledger/);
 });
 
 test('check ignores its own generated ledger and report files', () => {
