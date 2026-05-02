@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 const skillDir = path.resolve(import.meta.dirname, '..');
 const scriptPath = path.join(skillDir, 'scripts', 'agent-proof.mjs');
@@ -214,6 +215,23 @@ test('package exposes agent-proof binary for npx usage from any project', () => 
   assert.match(help.stdout, /agent-proof check/);
   assert.equal(doctor.status, 0, doctor.stderr);
   assert.match(doctor.stdout, /npx --yes .*agent-proof.* record --ledger/);
+});
+
+test('npx cache paths still produce copyable npx doctor suggestions', () => {
+  const moduleUrl = `${pathToFileURL(scriptPath).href}?case=cache`;
+  const npmCacheBin = path.join(os.tmpdir(), '_npx', 'example', 'node_modules', '.bin', 'agent-proof');
+  const npmDefaultBin = path.join(os.tmpdir(), '.npm', '_npx', 'example', 'node_modules', '.bin', 'agent-proof');
+  const script = `
+    const { commandForScriptPath } = await import(${JSON.stringify(moduleUrl)});
+    console.log(commandForScriptPath(${JSON.stringify(npmCacheBin)}, {}));
+    console.log(commandForScriptPath(${JSON.stringify(npmDefaultBin)}, {}));
+    console.log(commandForScriptPath(${JSON.stringify(npmCacheBin)}, { npm_command: 'exec', npm_config_package: 'github:owner/repo' }));
+  `;
+  const result = spawnSync('node', ['--input-type=module', '--eval', script], { encoding: 'utf8' });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /npx --yes github:AlcoholTobaccoCode\/Agent-proof-skill/);
+  assert.match(result.stdout, /npx --yes github:owner\/repo/);
 });
 
 test('check ignores its own generated ledger and report files', () => {

@@ -619,17 +619,21 @@ function commandText(command) {
   return command.map(shellQuote).join(' ');
 }
 
-function currentScriptCommand() {
-  const script = process.argv[1] ? path.resolve(process.argv[1]) : 'agent-proof.mjs';
+function commandForScriptPath(scriptPath, env = process.env) {
+  const script = scriptPath ? path.resolve(scriptPath) : 'agent-proof.mjs';
   if (path.basename(script) === 'agent-proof') {
-    if (process.env.npm_command === 'exec' && process.env.npm_config_package) {
-      return `npx --yes ${shellQuote(process.env.npm_config_package)}`;
+    if (env.npm_command === 'exec' && env.npm_config_package) {
+      return `npx --yes ${shellQuote(env.npm_config_package)}`;
     }
     const normalized = script.replaceAll('\\', '/');
-    if (normalized.includes('/.npm/_npx/')) return NPX_GITHUB_COMMAND;
+    if (normalized.includes('/_npx/')) return NPX_GITHUB_COMMAND;
     return 'agent-proof';
   }
   return `node ${shellQuote(script)}`;
+}
+
+function currentScriptCommand() {
+  return commandForScriptPath(process.argv[1]);
 }
 
 function recordCommand(options) {
@@ -778,7 +782,7 @@ function usage() {
 `;
 }
 
-export { analyzeDelivery, detectReportLanguage, inferVerificationType, loadLedger, renderMarkdown };
+export { analyzeDelivery, commandForScriptPath, detectReportLanguage, inferVerificationType, loadLedger, renderMarkdown };
 
 function main(argv) {
   const [command, ...rest] = argv;
