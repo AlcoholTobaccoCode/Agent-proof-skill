@@ -18,6 +18,20 @@ The default deliverable is a concise Markdown report that answers:
 - What verification evidence exists?
 - What important evidence is missing before commit?
 
+## Friction Budget
+
+Agent Proof is a delivery guardrail, not an approval workflow. Do not slow the user down with a full ritual for every tiny task.
+
+Use this triage before running the full flow:
+
+- No file changes, pure Q&A, planning, or analysis: skip Agent Proof and state that no file changes were made.
+- Low-risk docs, comments, copy, or prompt-only edits: lightweight mode is acceptable; mention that full Agent Proof was not run and list any unverified items.
+- Normal code changes: run Agent Proof and record at least one real verification command or manual check.
+- High-risk changes: always run Agent Proof and record matching evidence. High-risk includes UI, API/data flow, auth/session, config, dependency, migration, build, or release changes.
+- Commit/PR/handoff or explicit user request for verification: always run the full flow and archive the report if configured.
+
+The agent should absorb this process. Do not ask the user to decide which command to run unless local context is genuinely insufficient.
+
 ## Workflow
 
 1. Capture the delivery intent.

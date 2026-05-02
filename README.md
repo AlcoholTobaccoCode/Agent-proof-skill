@@ -172,18 +172,45 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
 
 你可以把下面这段放进项目的 `AGENTS.md`、Codex 自定义指令、Cursor Rules、Windsurf Rules，或者其他 AI 工具的项目规则里。
 
-重点是：不要写成“每次开始任务时就审查交付可信度”。任务刚开始还没改代码，审不出东西。正确做法是：
+重点是：不要写成“每次开始任务时就审查交付可信度”。任务刚开始还没改代码，审不出东西。也不要写成“每个小任务都必须完整跑一遍流程”，那会影响原本使用 AI 的效率。
+
+正确做法是：
 
 - 开始任务时记住用户意图
-- 改完代码后、准备说“完成”前，再跑 Agent Proof
-- 把报告归档到固定位置，方便以后回看
+- 改完后先判断风险等级
+- 高风险强制完整验收
+- 低风险轻量说明
+- 无文件改动直接跳过
+- 报告归档到固定位置，方便以后回看
 
 推荐模板：
 
 ```text
-每次完成代码改动、准备提交、或准备回复“完成”前，使用 agent-proof 审查本次 AI 改动的交付可信度。
+每次完成任务、准备回复用户前，先判断本次是否需要 Agent Proof。
 
-执行要求：
+分级规则：
+1. 无文件改动 / 纯问答 / 只做方案讨论：
+   - 跳过 Agent Proof。
+   - 回复中说明“本次无文件改动，未运行 Agent Proof”。
+
+2. 低风险改动：
+   - 例如 README、注释、纯文案、提示词、小范围非运行时代码说明。
+   - 可以跳过完整 Agent Proof，或只做轻量说明。
+   - 回复中说明“本次为低风险改动，未运行完整 Agent Proof”，并说明未验证项。
+
+3. 普通代码改动：
+   - 使用 Agent Proof。
+   - 至少记录一条真实验证证据，例如 typecheck、test、build、lint 或人工检查。
+
+4. 高风险改动：
+   - 必须使用 Agent Proof。
+   - 高风险包括 UI、API、auth/session、配置、依赖、数据流、迁移、构建发布相关改动。
+   - 必须补对应证据，不要只用口头声明。
+
+5. 准备提交、PR、交付给他人、或用户明确要求验收：
+   - 必须完整运行 Agent Proof 并归档报告。
+
+完整 Agent Proof 执行要求：
 1. 先运行：
    npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
    根据 doctor 输出选择当前项目真实存在的验证命令，不要假设一定有 npm run lint。
@@ -208,6 +235,12 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
    - 已记录哪些验证
    - 还有哪些风险或未验证项
    - 报告保存位置
+
+原则：
+- Agent Proof 是交付护栏，不是审批流。
+- 不要为了流程拖慢用户原本使用 AI 的效率。
+- 高风险强制，低风险轻量，无改动跳过。
+- 流程由 AI 自己承担，不要把判断和跑命令的负担甩给用户。
 ```
 
 如果你想让 AI 把每天的报告集中到一个文件，可以再加这段：

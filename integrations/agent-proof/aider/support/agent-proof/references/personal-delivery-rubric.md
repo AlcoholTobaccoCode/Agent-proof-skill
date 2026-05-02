@@ -8,6 +8,20 @@ The agent's completion claim is not evidence. Evidence comes from git changes, c
 
 Risks are not cleared by a manual checkbox. A risk is cleared by adding matching evidence to the evidence record and rerunning `check`.
 
+Keep the workflow lightweight. Agent Proof should protect delivery quality without making the user feel trapped in process.
+
+## When To Run Agent Proof
+
+| Situation | Expected behavior |
+|---|---|
+| No file changes, pure Q&A, planning, or analysis | Skip Agent Proof and state that no file changes were made. |
+| Low-risk docs, comments, copy, prompt-only edits | Lightweight mode is acceptable; state that full Agent Proof was not run and mention unverified items. |
+| Normal code changes | Run Agent Proof and record at least one real verification command or manual check. |
+| UI, API/data flow, auth/session, config, dependency, migration, build, or release changes | Full Agent Proof is required, with matching evidence for the changed surface. |
+| Commit, PR, handoff, or explicit user request for verification | Full Agent Proof is required and the report should be archived if configured. |
+
+Short version: high risk forced, low risk lightweight, no changes skipped.
+
 ## Score Bands
 
 | Score | Decision | Meaning |
