@@ -622,6 +622,9 @@ function commandText(command) {
 function currentScriptCommand() {
   const script = process.argv[1] ? path.resolve(process.argv[1]) : 'agent-proof.mjs';
   if (path.basename(script) === 'agent-proof') {
+    if (process.env.npm_command === 'exec' && process.env.npm_config_package) {
+      return `npx --yes ${shellQuote(process.env.npm_config_package)}`;
+    }
     const normalized = script.replaceAll('\\', '/');
     if (normalized.includes('/.npm/_npx/')) return NPX_GITHUB_COMMAND;
     return 'agent-proof';

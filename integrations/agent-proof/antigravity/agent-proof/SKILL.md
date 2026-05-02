@@ -30,17 +30,21 @@ The default deliverable is a concise Markdown report that answers:
 3. Capture verification evidence.
    Prefer automatic ledger generation with the Node script. Use Python only as a fallback when Node is unavailable.
 
-   First inspect the target project's actual scripts:
-
-   ```bash
-   node /path/to/agent-proof/scripts/agent-proof.mjs doctor --repo /path/to/project
-   ```
-
-   When the user is inside an arbitrary project and does not know the skill install path, prefer the GitHub package entrypoint instead of `node scripts/agent-proof.mjs`:
+   First inspect the target project's actual scripts. When the user is inside an arbitrary project, prefer the GitHub package entrypoint so the command works without knowing the skill install path:
 
    ```bash
    npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
    ```
+
+   Record verification with the same universal entrypoint:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+     --ledger .agent-proof/verification-ledger.json \
+     -- pnpm typecheck
+   ```
+
+   If the skill is already checked out locally and the absolute path is known, direct Node execution is also valid:
 
    ```bash
    node /path/to/agent-proof/scripts/agent-proof.mjs record \
@@ -51,7 +55,18 @@ The default deliverable is a concise Markdown report that answers:
    This runs the command, records exit code, duration, status, timestamp, and inferred verification type, then appends the result to the ledger. For a command that may fail but should still be recorded without stopping the shell flow, add `--allow-failure`.
 
 4. Run the local checker.
-   Use the Node checker first:
+   Use the Node checker first through the universal GitHub package entrypoint:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
+     --repo . \
+     --intent "Fix login persistence" \
+     --claims "Login persistence is complete and tests pass" \
+     --verification-file .agent-proof/verification-ledger.json \
+     --output .agent-proof/delivery-report.md
+   ```
+
+   If the local skill path is known, direct Node execution is also valid:
 
    ```bash
    node /path/to/agent-proof/scripts/agent-proof.mjs check \

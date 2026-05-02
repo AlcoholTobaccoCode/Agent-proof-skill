@@ -48,13 +48,7 @@ node scripts/agent-proof.mjs --help
 
 在任意项目里使用时，不要写 `node scripts/agent-proof.mjs`。这个相对路径会指向当前业务项目的 `scripts/` 目录；如果项目里没有这个文件，就会报 `Cannot find module .../scripts/agent-proof.mjs`。
 
-通用方式是用 GitHub 包入口运行：
-
-```bash
-npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
-```
-
-先让 Agent Proof 扫一下项目里真实存在的验证脚本，不要默认假设 `npm run lint` 一定存在：
+通用方式是用 GitHub 包入口运行。先让 Agent Proof 扫一下项目里真实存在的验证脚本，不要默认假设 `npm run lint` 一定存在：
 
 ```bash
 npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .

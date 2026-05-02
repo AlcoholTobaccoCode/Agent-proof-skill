@@ -28,7 +28,7 @@ The agent's completion claim is not evidence. Evidence comes from git changes, c
 ## Good Evidence
 
 - exact command and status, such as `npm test -> passed`
-- automatic ledger entries from `node scripts/agent-proof.mjs record -- <command>`
+- automatic ledger entries from `npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record -- <command>`
 - screenshot or simulator check for user-visible UI
 - manual check note with the path checked and outcome
 - explicit skipped verification with reason and next action

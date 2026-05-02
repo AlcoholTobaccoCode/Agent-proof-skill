@@ -1,0 +1,7 @@
+.git/
+.github/
+.agent-proof/
+tests/
+integrations/
+*.tgz
+.DS_Store
