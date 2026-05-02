@@ -7,6 +7,7 @@ import test from 'node:test';
 
 const skillDir = path.resolve(import.meta.dirname, '..');
 const scriptPath = path.join(skillDir, 'scripts', 'agent-proof.mjs');
+const packagePath = path.join(skillDir, 'package.json');
 
 function run(command, args, cwd) {
   return execFileSync(command, args, { cwd, encoding: 'utf8' });
@@ -187,6 +188,32 @@ test('doctor suggests existing workspace verification scripts', () => {
   assert.match(result.stdout, /node .*agent-proof\.mjs record .*pnpm typecheck/);
   assert.match(result.stdout, /pnpm --filter @sample\/app typecheck/);
   assert.doesNotMatch(result.stdout, /npm run lint/);
+});
+
+test('package exposes agent-proof binary for npx usage from any project', () => {
+  const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-bin-'));
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      scripts: { typecheck: 'tsc --noEmit' },
+    }),
+  );
+
+  assert.equal(pkg.bin?.['agent-proof'], './scripts/agent-proof.mjs');
+  const help = spawnSync('npm', ['exec', '--package', skillDir, '--', 'agent-proof', '--help'], {
+    cwd: os.tmpdir(),
+    encoding: 'utf8',
+  });
+  const doctor = spawnSync('npm', ['exec', '--package', skillDir, '--', 'agent-proof', 'doctor', '--repo', root], {
+    cwd: os.tmpdir(),
+    encoding: 'utf8',
+  });
+
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /agent-proof check/);
+  assert.equal(doctor.status, 0, doctor.stderr);
+  assert.match(doctor.stdout, /agent-proof record --ledger/);
 });
 
 test('check ignores its own generated ledger and report files', () => {

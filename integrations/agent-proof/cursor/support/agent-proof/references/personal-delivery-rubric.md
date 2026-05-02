@@ -46,9 +46,9 @@ The agent's completion claim is not evidence. Evidence comes from git changes, c
 Use Node first because most vibe coding machines already have it:
 
 ```bash
-node generated-skills/agent-proof/scripts/agent-proof.mjs doctor --repo .
-node generated-skills/agent-proof/scripts/agent-proof.mjs record --ledger .agent-proof/verification-ledger.json -- pnpm typecheck
-node generated-skills/agent-proof/scripts/agent-proof.mjs check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record --ledger .agent-proof/verification-ledger.json -- pnpm typecheck
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
 `check` renders the report from the current system locale: English locales produce English, Chinese locales produce Chinese, and uncertain locales fall back to Chinese. Use `--language zh` or `--language en` when deterministic report language matters.
@@ -56,8 +56,8 @@ node generated-skills/agent-proof/scripts/agent-proof.mjs check --repo . --verif
 Use Python only when Node is unavailable:
 
 ```bash
-python3 generated-skills/agent-proof/scripts/agent_proof.py record --ledger .agent-proof/verification-ledger.json -- python3 -m unittest
-python3 generated-skills/agent-proof/scripts/agent_proof.py check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
+python3 /path/to/Agent-proof-skill/scripts/agent_proof.py record --ledger .agent-proof/verification-ledger.json -- python3 -m unittest
+python3 /path/to/Agent-proof-skill/scripts/agent_proof.py check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
 ```
 
 ## Reviewer Tone

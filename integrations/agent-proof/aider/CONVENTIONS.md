@@ -35,6 +35,12 @@ The default deliverable is a concise Markdown report that answers:
    node /path/to/agent-proof/scripts/agent-proof.mjs doctor --repo /path/to/project
    ```
 
+   When the user is inside an arbitrary project and does not know the skill install path, prefer the GitHub package entrypoint instead of `node scripts/agent-proof.mjs`:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
+   ```
+
    ```bash
    node /path/to/agent-proof/scripts/agent-proof.mjs record \
      --ledger .agent-proof/verification-ledger.json \

@@ -620,6 +620,7 @@ function commandText(command) {
 
 function currentScriptCommand() {
   const script = process.argv[1] ? path.resolve(process.argv[1]) : 'agent-proof.mjs';
+  if (path.basename(script) === 'agent-proof') return 'agent-proof';
   return `node ${shellQuote(script)}`;
 }
 
@@ -763,9 +764,9 @@ function doctor(options) {
 
 function usage() {
   return `Usage:
-  node agent-proof.mjs record --ledger verification-ledger.json -- <command...>
-  node agent-proof.mjs check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md [--language auto|zh|en]
-  node agent-proof.mjs doctor --repo <repo>
+  agent-proof record --ledger verification-ledger.json -- <command...>
+  agent-proof check --repo <repo> --intent <text> --claims <text> --verification-file <ledger.json> --output delivery-report.md [--language auto|zh|en]
+  agent-proof doctor --repo <repo>
 `;
 }
 
@@ -784,8 +785,18 @@ function main(argv) {
   throw new Error(`unknown command: ${command}`);
 }
 
-const entryPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && path.resolve(process.argv[1]) === entryPath) {
+function isCliEntry(argvPath, moduleUrl) {
+  if (!argvPath) return false;
+  const modulePath = fileURLToPath(moduleUrl);
+  const invokedPath = path.resolve(argvPath);
+  try {
+    return fs.realpathSync(invokedPath) === fs.realpathSync(modulePath);
+  } catch {
+    return invokedPath === modulePath;
+  }
+}
+
+if (isCliEntry(process.argv[1], import.meta.url)) {
   try {
     process.exitCode = main(process.argv.slice(2));
   } catch (error) {

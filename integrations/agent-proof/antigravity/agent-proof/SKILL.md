@@ -3,7 +3,7 @@ name: agent-proof
 description: Use when reviewing an individual developer's AI-assisted coding delivery before commit, especially vibe coding work that needs evidence-based checks for git changes, agent claims, tests, build/lint results, UI screenshots, manual verification, and missing-risk disclosure.
 risk: low
 source: local
-date_added: '2026-05-01'
+date_added: '2026-05-02'
 ---
 # Agent Proof
 
@@ -34,6 +34,12 @@ The default deliverable is a concise Markdown report that answers:
 
    ```bash
    node /path/to/agent-proof/scripts/agent-proof.mjs doctor --repo /path/to/project
+   ```
+
+   When the user is inside an arbitrary project and does not know the skill install path, prefer the GitHub package entrypoint instead of `node scripts/agent-proof.mjs`:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
    ```
 
    ```bash

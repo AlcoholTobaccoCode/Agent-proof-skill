@@ -36,6 +36,8 @@ npx skills add https://github.com/AlcoholTobaccoCode/Agent-proof-skill --skill a
 
 更新完成后重启 Codex 或对应 agent 客户端，避免继续使用旧的 skill 缓存。
 
+注意：`npx skills add ...` 是把 skill 安装给 agent 用，不会在你的每个业务项目里创建 `scripts/agent-proof.mjs`。在业务项目里手动跑命令时，用下面“快速使用”里的 `npx --yes github:...` 通用命令。
+
 本地开发时可以直接在仓库根目录运行：
 
 ```bash
@@ -44,16 +46,24 @@ node scripts/agent-proof.mjs --help
 
 ## 快速使用
 
+在任意项目里使用时，不要写 `node scripts/agent-proof.mjs`。这个相对路径会指向当前业务项目的 `scripts/` 目录；如果项目里没有这个文件，就会报 `Cannot find module .../scripts/agent-proof.mjs`。
+
+通用方式是用 GitHub 包入口运行：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
+```
+
 先让 Agent Proof 扫一下项目里真实存在的验证脚本，不要默认假设 `npm run lint` 一定存在：
 
 ```bash
-node scripts/agent-proof.mjs doctor --repo /path/to/project
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
 ```
 
 再用 Node 记录验证命令，Node 是默认推荐入口：
 
 ```bash
-node scripts/agent-proof.mjs record \
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
   --ledger .agent-proof/verification-ledger.json \
   -- pnpm typecheck
 ```
@@ -63,8 +73,8 @@ node scripts/agent-proof.mjs record \
 再生成交付验收报告：
 
 ```bash
-node scripts/agent-proof.mjs check \
-  --repo /path/to/project \
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
+  --repo . \
   --intent "Fix login persistence" \
   --claims "Login persistence is complete and tests pass" \
   --verification-file .agent-proof/verification-ledger.json \
@@ -74,17 +84,17 @@ node scripts/agent-proof.mjs check \
 报告默认按当前系统语言生成：能确认英文环境就输出英文，能确认中文环境就输出中文，`C` / `POSIX` / 无法判断时回落中文。需要手动指定时加：
 
 ```bash
-node scripts/agent-proof.mjs check \
-  --repo /path/to/project \
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
+  --repo . \
   --verification-file .agent-proof/verification-ledger.json \
   --output .agent-proof/delivery-report.md \
   --language zh
 ```
 
-如果 Node 不可用，可以用 Python 兜底：
+如果 Node 不可用，可以用 Python 兜底，但要写 Agent Proof 的真实安装路径或克隆路径，不要写当前业务项目里的相对路径：
 
 ```bash
-python3 scripts/agent_proof.py record \
+python3 /path/to/Agent-proof-skill/scripts/agent_proof.py record \
   --ledger .agent-proof/verification-ledger.json \
   -- python3 -m unittest
 ```

@@ -4,6 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "agent-proof": "./scripts/agent-proof.mjs"
+  },
   "scripts": {
     "audit": "node scripts/convert-integrations.mjs audit --skill .",
     "convert": "node scripts/convert-integrations.mjs convert --skill . --out integrations/agent-proof --tool all",
