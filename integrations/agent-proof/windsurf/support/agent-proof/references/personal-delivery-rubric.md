@@ -6,6 +6,8 @@ Use this rubric for individual developers checking AI-assisted coding work befor
 
 The agent's completion claim is not evidence. Evidence comes from git changes, command results, screenshots, manual checks, or explicit notes about what was not verified.
 
+Risks are not cleared by a manual checkbox. A risk is cleared by adding matching evidence to the evidence record and rerunning `check`.
+
 ## Score Bands
 
 | Score | Decision | Meaning |
@@ -24,6 +26,25 @@ The agent's completion claim is not evidence. Evidence comes from git changes, c
 | config, env, dependency, build files | build, typecheck, local start, or runtime check | config/dependency change lacks runtime verification |
 | claim says tests passed | passing test command in ledger | claim mentions tests but no passing test evidence |
 | completion claim with no ledger | at least one verification entry or explicit unverified note | completion claim has no evidence ledger |
+
+## How To Clear Common Risks
+
+Use "evidence record" in user-facing explanations. `ledger` is the CLI/internal name for the same file.
+
+| Report risk | What to add | Current command |
+|---|---|---|
+| UI changed without visual evidence | screenshot, browser/simulator check, or manual visual note | `record --note "Checked changed screen visually" -- node -e "console.log('manual visual check passed')"` |
+| claim mentions tests but no passing test evidence | a real passing test command | `record -- pnpm test` |
+| config/dependency change lacks runtime verification | typecheck, build, or local start command | `record -- pnpm typecheck` or `record -- pnpm build` |
+| API/data-flow change lacks failure-path evidence | test/integration/manual check covering success and failure path | `record --note "Checked success and error response paths" -- node -e "console.log('manual api check passed')"` |
+
+After adding evidence, rerun:
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check --repo . --verification-file .agent-proof/verification-ledger.json --output .agent-proof/delivery-report.md
+```
+
+If the risk remains, inspect `.agent-proof/verification-ledger.json` and confirm the relevant entry has `"status": "passed"` and a type/command that matches the risk.
 
 ## Good Evidence
 

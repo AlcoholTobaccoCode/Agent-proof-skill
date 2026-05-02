@@ -92,7 +92,28 @@ The default deliverable is a concise Markdown report that answers:
 5. Read the report like a gate, not a summary.
    A low score means "needs evidence", not necessarily "bad code". Recommend the smallest missing verification step before commit.
 
+   Do not tell the user to manually mark a risk complete. A risk is cleared by adding matching evidence to the evidence record and rerunning `check`.
+
+   For UI visual evidence, prefer a real screenshot/browser/simulator command. If the user performed a manual visual check and no screenshot tooling is available, record it with a passing command plus a clear note:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+     --ledger .agent-proof/verification-ledger.json \
+     --note "Checked the changed home screen in browser; desktop and mobile layouts look correct" \
+     -- node -e "console.log('manual visual check passed')"
+   ```
+
+   For "claims mention tests but no passing test evidence", run and record the real project test command, for example:
+
+   ```bash
+   npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+     --ledger .agent-proof/verification-ledger.json \
+     -- pnpm test
+   ```
+
 ## Verification Ledger
+
+For user-facing explanations, call the ledger an "evidence record" first and mention the filename second. `ledger` is the CLI/internal term; `.agent-proof/verification-ledger.json` is the file that stores what was actually checked.
 
 The checker accepts JSON shaped as either a list or an object with `verifications`:
 

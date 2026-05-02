@@ -66,6 +66,8 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
 
 `record` 会真正运行 `pnpm typecheck`，然后把命令、退出码、耗时、通过/失败状态写进 `.agent-proof/verification-ledger.json`。
 
+这个文件可以理解成“证据记录”。CLI 参数里还叫 `ledger`，是为了兼容脚本和老版本命令；用户心里把它当成“这次到底验了什么”的记录本就行。
+
 第三步，生成交付验收报告：
 
 ```bash
@@ -85,6 +87,86 @@ npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
 - 需要补跑什么验证
 
 低分不等于代码一定烂，它只说明证据不够。比如 UI 改了却没截图，配置改了却没 build，API 改了却没跑成功/失败路径，这些都会被打下来。
+
+## 风险怎么消掉
+
+Agent Proof 不是让你手动勾选“已完成”。那种勾选很容易变成自欺欺人。
+
+它的规则是：
+
+```text
+风险出现 -> 补一条对应证据 -> 重新 check -> 风险自动消失
+```
+
+### UI 改动缺少视觉证据
+
+如果报告里出现：
+
+```text
+UI 改动缺少视觉证据
+```
+
+意思是：你改了页面、组件或样式，但证据记录里没有截图、浏览器检查、模拟器检查或人工视觉检查。
+
+能自动截图就记录截图命令：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+  --ledger .agent-proof/verification-ledger.json \
+  -- xcrun simctl io booted screenshot .agent-proof/ui-check.png
+```
+
+如果只是人工检查，也要留下记录。当前版本可以先用一个一定成功的小命令配合 `--note`：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+  --ledger .agent-proof/verification-ledger.json \
+  --note "已在浏览器检查首页，桌面和移动端布局正常" \
+  -- node -e "console.log('manual visual check passed')"
+```
+
+这条会在证据记录里写入一条通过的人工检查。下次重新跑 `check`，UI 视觉风险就会被这条证据覆盖。
+
+### 声称已测试但缺少通过记录
+
+如果报告里出现：
+
+```text
+声称已测试但缺少通过记录
+```
+
+意思是：AI 的交付说明里写了“测试通过”之类的话，但证据记录里没有任何通过的测试命令。嘴上说测过不算，得把真实命令跑一遍：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill record \
+  --ledger .agent-proof/verification-ledger.json \
+  -- pnpm test
+```
+
+项目没有 `pnpm test` 就先跑：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill doctor --repo .
+```
+
+复制 doctor 推荐的真实测试、类型检查或构建命令。别硬抄不存在的脚本。
+
+### 补完证据后重新生成报告
+
+每补一条证据，都重新跑一次：
+
+```bash
+npx --yes github:AlcoholTobaccoCode/Agent-proof-skill check \
+  --repo . \
+  --intent "这次让 AI 改什么" \
+  --claims "AI 最后声称完成了什么" \
+  --verification-file .agent-proof/verification-ledger.json \
+  --output .agent-proof/delivery-report.md
+```
+
+如果风险还在，说明证据类型没对上，或者命令失败了。打开 `.agent-proof/verification-ledger.json` 看最近一条是不是 `status: "passed"`。
+
+后续可以把人工检查简化成更顺手的命令，比如 `agent-proof evidence --type visual --status passed --note "..."`。当前版本还没有这个命令，所以文档里先按已经能跑的 `record --note ... -- node -e ...` 写。
 
 ## 语言规则
 
